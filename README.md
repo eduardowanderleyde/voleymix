@@ -31,3 +31,4 @@ Depois disso, `firebase deploy --only firestore:rules` publica as regras de segu
 - `peladas/{id}`: `ownerId`, `modo` (`aleatorio`/`balanceado`), `numTimes`, `times` (snapshot dos jogadores por time), `createdAt`
 
 Cada organizador só enxerga os próprios jogadores e peladas.
+# voleymix
