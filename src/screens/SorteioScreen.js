@@ -1,11 +1,24 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  useWindowDimensions,
+} from 'react-native';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useNavigation } from '@react-navigation/native';
+import Feather from '@expo/vector-icons/Feather';
 import { auth, db } from '../config/firebase';
-import { colors, POSICOES } from '../theme';
+import { colors, POSICOES, POSICAO_LABEL_PLURAL, cardShadow } from '../theme';
 import Screen from '../components/Screen';
-import { sortearTimes } from '../utils/sorteio';
+import { sortearTimes, posicoesFaltando, faltasGlobais, FORMACAO_IDEAL } from '../utils/sorteio';
+import { mostrarAlerta } from '../utils/alerta';
+import { iniciais } from '../utils/iniciais';
+import { useMinhaColecao } from '../hooks/useMinhaColecao';
 
 const POSICAO_LABEL = Object.fromEntries(POSICOES.map((p) => [p.value, p.label]));
 const MIN_TIMES = 2;
@@ -13,44 +26,55 @@ const MAX_TIMES = 6;
 
 export default function SorteioScreen() {
   const navigation = useNavigation();
-  const [jogadores, setJogadores] = useState([]);
+  const { width } = useWindowDimensions();
+  const largo = width >= 900;
+
+  const { dados: jogadores, carregando } = useMinhaColecao('jogadores', (a, b) => a.nome.localeCompare(b.nome));
   const [presentes, setPresentes] = useState({});
-  const [carregando, setCarregando] = useState(true);
   const [numTimes, setNumTimes] = useState(2);
   const [modo, setModo] = useState('balanceado');
   const [times, setTimes] = useState(null);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    const q = query(
-      collection(db, 'jogadores'),
-      where('ownerId', '==', auth.currentUser.uid),
-      orderBy('nome', 'asc')
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const lista = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setJogadores(lista);
-      setPresentes((atual) => {
-        const novo = { ...atual };
-        lista.forEach((j) => {
-          if (!(j.id in novo)) novo[j.id] = true;
-        });
-        return novo;
+    setPresentes((atual) => {
+      const novo = { ...atual };
+      jogadores.forEach((j) => {
+        if (!(j.id in novo)) novo[j.id] = true;
       });
-      setCarregando(false);
+      return novo;
     });
-    return unsubscribe;
-  }, []);
+  }, [jogadores]);
+
+  const listaPresentes = useMemo(() => jogadores.filter((j) => presentes[j.id]), [jogadores, presentes]);
+
+  const composicao = useMemo(() => {
+    return POSICOES.map((p) => {
+      const count = listaPresentes.filter((j) => j.posicao === p.value).length;
+      const necessario = (FORMACAO_IDEAL[p.value] || 0) * numTimes;
+      return { posicao: p.value, label: POSICAO_LABEL_PLURAL[p.value], count, ok: count >= necessario };
+    });
+  }, [listaPresentes, numTimes]);
+
+  const avisoFaltando = useMemo(() => faltasGlobais(listaPresentes, numTimes), [listaPresentes, numTimes]);
+
+  function selecionarTodos(valor) {
+    const novo = {};
+    jogadores.forEach((j) => {
+      novo[j.id] = valor;
+    });
+    setPresentes(novo);
+    setTimes(null);
+  }
 
   function alternarPresenca(id) {
     setPresentes((atual) => ({ ...atual, [id]: !atual[id] }));
+    setTimes(null);
   }
-
-  const listaPresentes = jogadores.filter((j) => presentes[j.id]);
 
   function handleSortear() {
     if (listaPresentes.length < numTimes) {
-      Alert.alert('Jogadores insuficientes', `Marque presença de pelo menos ${numTimes} jogadores.`);
+      mostrarAlerta('Jogadores insuficientes', `Marque presença de pelo menos ${numTimes} jogadores.`);
       return;
     }
     setTimes(sortearTimes(listaPresentes, numTimes, modo));
@@ -64,109 +88,238 @@ export default function SorteioScreen() {
         ownerId: auth.currentUser.uid,
         modo,
         numTimes,
-        times: times.map((time) => time.map((j) => ({ id: j.id, nome: j.nome, nivel: j.nivel, posicao: j.posicao }))),
+        times: times.map((time) =>
+          time.map((j) => ({ id: j.id, nome: j.nome, nivelMedio: j.nivelMedio, posicao: j.posicao }))
+        ),
         createdAt: serverTimestamp(),
       });
-      Alert.alert('Pelada salva no histórico!');
+      mostrarAlerta('Pelada salva no histórico!');
       navigation.navigate('Historico');
     } catch (e) {
-      Alert.alert('Não deu pra salvar. Tenta de novo.');
+      mostrarAlerta('Não deu pra salvar. Tenta de novo.', e.message);
     } finally {
       setSalvando(false);
     }
   }
 
+  const jogadoresPorTime = numTimes > 0 ? Math.floor(listaPresentes.length / numTimes) : 0;
+
   return (
-    <Screen edges={['top']}>
-      <FlatList
-        contentContainerStyle={styles.lista}
-        data={jogadores}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <View>
-            <Text style={styles.title}>🔀 Sortear times</Text>
+    <Screen edges={['bottom']}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.container}>
+          <Text style={styles.title}>🔀 Sortear times</Text>
 
-            {carregando ? null : jogadores.length === 0 ? (
+          {carregando ? (
+            <View style={styles.center}>
+              <ActivityIndicator color={colors.ocean} />
+            </View>
+          ) : jogadores.length === 0 ? (
+            <View style={styles.center}>
               <Text style={styles.emptyText}>
-                Cadastre jogadores na aba "Jogadores" antes de sortear os times.
+                Cadastre jogadores antes de sortear os times.
               </Text>
-            ) : (
-              <>
-                <Text style={styles.sectionLabel}>Quem vai jogar hoje?</Text>
-                <Text style={styles.hint}>Toque pra marcar quem está ausente.</Text>
-              </>
-            )}
-          </View>
-        }
-        renderItem={({ item }) =>
-          jogadores.length === 0 ? null : (
-            <TouchableOpacity
-              style={[styles.jogadorCard, !presentes[item.id] && styles.jogadorCardAusente]}
-              onPress={() => alternarPresenca(item.id)}
-            >
-              <Text style={[styles.jogadorNome, !presentes[item.id] && styles.textoAusente]}>
-                {presentes[item.id] ? '✅' : '⬜️'} {item.nome}
-              </Text>
-              <Text style={[styles.jogadorMeta, !presentes[item.id] && styles.textoAusente]}>
-                Nível {item.nivel} · {POSICAO_LABEL[item.posicao] || item.posicao}
-              </Text>
-            </TouchableOpacity>
-          )
-        }
-        ListFooterComponent={
-          jogadores.length === 0 ? null : (
-            <View>
-              <Text style={styles.sectionLabel}>Número de times</Text>
-              <View style={styles.row}>
-                {Array.from({ length: MAX_TIMES - MIN_TIMES + 1 }, (_, i) => i + MIN_TIMES).map((n) => (
-                  <TouchableOpacity
-                    key={n}
-                    style={[styles.chip, numTimes === n && styles.chipAtivo]}
-                    onPress={() => setNumTimes(n)}
-                  >
-                    <Text style={[styles.chipText, numTimes === n && styles.chipTextAtivo]}>{n}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.sectionLabel}>Modo</Text>
-              <View style={styles.row}>
-                <TouchableOpacity
-                  style={[styles.chip, styles.chipModo, modo === 'balanceado' && styles.chipAtivo]}
-                  onPress={() => setModo('balanceado')}
-                >
-                  <Text style={[styles.chipText, modo === 'balanceado' && styles.chipTextAtivo]}>
-                    ⚖️ Balanceado
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.chip, styles.chipModo, modo === 'aleatorio' && styles.chipAtivo]}
-                  onPress={() => setModo('aleatorio')}
-                >
-                  <Text style={[styles.chipText, modo === 'aleatorio' && styles.chipTextAtivo]}>
-                    🎲 Aleatório
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.contagem}>{listaPresentes.length} jogador(es) presente(s)</Text>
-
-              <TouchableOpacity style={styles.button} onPress={handleSortear}>
-                <Text style={styles.buttonText}>Sortear times</Text>
+              <TouchableOpacity
+                style={styles.emptyButton}
+                onPress={() => navigation.navigate('Jogadores')}
+              >
+                <Text style={styles.emptyButtonText}>Ir para Jogadores</Text>
               </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <View style={styles.resumoRow}>
+                <View style={styles.resumoChip}>
+                  <Text style={styles.resumoNumero}>{listaPresentes.length}</Text>
+                  <Text style={styles.resumoLabel}>presentes</Text>
+                </View>
+                <View style={styles.resumoChip}>
+                  <Text style={styles.resumoNumero}>{numTimes}</Text>
+                  <Text style={styles.resumoLabel}>times</Text>
+                </View>
+                <View style={styles.resumoChip}>
+                  <Text style={styles.resumoNumero}>{jogadoresPorTime}</Text>
+                  <Text style={styles.resumoLabel}>por time</Text>
+                </View>
+                <View style={styles.resumoChip}>
+                  <Text style={styles.resumoNumeroTexto}>
+                    {modo === 'balanceado' ? '⚖️ Balanceado' : '🎲 Aleatório'}
+                  </Text>
+                  <Text style={styles.resumoLabel}>modo</Text>
+                </View>
+              </View>
+
+              <View style={[styles.colunas, largo && styles.colunasLargo]}>
+                <View style={[styles.colEsquerda, largo && styles.colEsquerdaLargo]}>
+                  <View style={styles.colHeader}>
+                    <Text style={styles.sectionLabel}>Quem vai jogar?</Text>
+                    <View style={styles.colHeaderAcoes}>
+                      <TouchableOpacity onPress={() => selecionarTodos(true)}>
+                        <Text style={styles.linkAcao}>Selecionar todos</Text>
+                      </TouchableOpacity>
+                      <Text style={styles.separadorAcao}>·</Text>
+                      <TouchableOpacity onPress={() => selecionarTodos(false)}>
+                        <Text style={styles.linkAcao}>Limpar seleção</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.gridJogadores}>
+                    {jogadores.map((item, index) => {
+                      const ativo = !!presentes[item.id];
+                      return (
+                        <TouchableOpacity
+                          key={item.id}
+                          style={[styles.jogadorCard, ativo ? styles.jogadorCardAtivo : styles.jogadorCardInativo]}
+                          onPress={() => alternarPresenca(item.id)}
+                        >
+                          <View style={styles.jogadorTopo}>
+                            <View
+                              style={[
+                                styles.avatar,
+                                { backgroundColor: index % 2 === 0 ? colors.navy : colors.ocean },
+                                !ativo && styles.avatarInativo,
+                              ]}
+                            >
+                              <Text style={styles.avatarText}>{iniciais(item.nome)}</Text>
+                            </View>
+                            <Feather
+                              name={ativo ? 'check-square' : 'square'}
+                              size={16}
+                              color={ativo ? colors.ocean : colors.inkSoft}
+                            />
+                          </View>
+                          <Text style={[styles.jogadorNome, !ativo && styles.textoInativo]} numberOfLines={1}>
+                            {item.nome}
+                          </Text>
+                          <Text style={[styles.jogadorPosicao, !ativo && styles.textoInativo]}>
+                            {POSICAO_LABEL[item.posicao] || item.posicao}
+                          </Text>
+                          <View style={styles.pontosRow}>
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <View
+                                key={n}
+                                style={[
+                                  styles.ponto,
+                                  n <= (item.nivelMedio ?? 0) && (ativo ? styles.pontoAtivo : styles.pontoInativo),
+                                ]}
+                              />
+                            ))}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.colDireita,
+                    largo && styles.colDireitaLargo,
+                    largo && Platform.OS === 'web' && styles.colDireitaSticky,
+                  ]}
+                >
+                  <View style={styles.painelCard}>
+                    <Text style={styles.sectionLabel}>Número de times</Text>
+                    <View style={styles.row}>
+                      {Array.from({ length: MAX_TIMES - MIN_TIMES + 1 }, (_, i) => i + MIN_TIMES).map((n) => (
+                        <TouchableOpacity
+                          key={n}
+                          style={[styles.numeroChip, numTimes === n && styles.numeroChipAtivo]}
+                          onPress={() => {
+                            setNumTimes(n);
+                            setTimes(null);
+                          }}
+                        >
+                          <Text style={[styles.numeroChipText, numTimes === n && styles.numeroChipTextAtivo]}>
+                            {n}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Modo</Text>
+                    <View style={styles.modoRow}>
+                      <TouchableOpacity
+                        style={[styles.modoCard, modo === 'balanceado' && styles.modoCardAtivo]}
+                        onPress={() => setModo('balanceado')}
+                      >
+                        <Text style={styles.modoEmoji}>⚖️</Text>
+                        <Text style={[styles.modoTexto, modo === 'balanceado' && styles.modoTextoAtivo]}>
+                          Balanceado
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.modoCard, modo === 'aleatorio' && styles.modoCardAtivo]}
+                        onPress={() => setModo('aleatorio')}
+                      >
+                        <Text style={styles.modoEmoji}>🎲</Text>
+                        <Text style={[styles.modoTexto, modo === 'aleatorio' && styles.modoTextoAtivo]}>
+                          Aleatório
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Composição dos presentes</Text>
+                    {composicao
+                      .filter((c) => c.count > 0 || FORMACAO_IDEAL[c.posicao])
+                      .map((c) => (
+                        <View key={c.posicao} style={styles.composicaoLinha}>
+                          <Feather
+                            name={c.ok ? 'check-circle' : 'alert-triangle'}
+                            size={14}
+                            color={c.ok ? colors.ocean : colors.coral}
+                          />
+                          <Text style={[styles.composicaoTexto, !c.ok && styles.composicaoTextoAlerta]}>
+                            {c.count} {c.label}
+                          </Text>
+                        </View>
+                      ))}
+
+                    {avisoFaltando.length > 0 && (
+                      <View style={styles.avisoBox}>
+                        <Text style={styles.avisoTexto}>
+                          Atenção: falta{' '}
+                          {avisoFaltando
+                            .map((f) => `${f.falta}x ${POSICAO_LABEL[f.posicao]}`)
+                            .join(', ')}{' '}
+                          pra fechar {numTimes} times completos.
+                        </Text>
+                      </View>
+                    )}
+
+                    <TouchableOpacity style={styles.button} onPress={handleSortear}>
+                      <Text style={styles.buttonText}>Sortear times</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
 
               {times && (
                 <View style={styles.resultado}>
-                  {times.map((time, i) => (
-                    <View key={i} style={styles.timeCard}>
-                      <Text style={styles.timeTitulo}>Time {i + 1}</Text>
-                      {time.map((j) => (
-                        <Text key={j.id} style={styles.timeJogador}>
-                          {j.nome} — nível {j.nivel}
-                        </Text>
-                      ))}
-                    </View>
-                  ))}
+                  <Text style={styles.sectionLabel}>Resultado</Text>
+                  <View style={styles.resultadoGrid}>
+                    {times.map((time, i) => {
+                      const faltas = posicoesFaltando(time);
+                      return (
+                        <View key={i} style={styles.timeCard}>
+                          <Text style={styles.timeTitulo}>Time {i + 1}</Text>
+                          {time.map((j) => (
+                            <Text key={j.id} style={styles.timeJogador}>
+                              {j.nome} — nível {j.nivelMedio}
+                            </Text>
+                          ))}
+                          <Text style={faltas.length ? styles.timeAviso : styles.timeCompleto}>
+                            {faltas.length
+                              ? `⚠️ Faltando: ${faltas
+                                  .map(({ posicao, falta }) => `${falta}x ${POSICAO_LABEL[posicao]}`)
+                                  .join(', ')}`
+                              : '✅ Formação completa'}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
 
                   <TouchableOpacity
                     style={[styles.button, styles.buttonSecundario]}
@@ -181,55 +334,153 @@ export default function SorteioScreen() {
                   </TouchableOpacity>
                 </View>
               )}
-            </View>
-          )
-        }
-      />
+            </>
+          )}
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  lista: { padding: 16, paddingBottom: 40 },
-  title: { fontSize: 20, fontWeight: '700', color: colors.navy, marginBottom: 12 },
-  emptyText: { color: colors.inkSoft, fontSize: 15 },
-  sectionLabel: { fontSize: 14, fontWeight: '700', color: colors.ink, marginTop: 16, marginBottom: 4 },
-  hint: { fontSize: 12, color: colors.inkSoft, marginBottom: 8 },
-  jogadorCard: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  jogadorCardAusente: { opacity: 0.5 },
-  jogadorNome: { fontSize: 15, fontWeight: '700', color: colors.ink },
-  jogadorMeta: { fontSize: 12, color: colors.inkSoft, marginTop: 2 },
-  textoAusente: { textDecorationLine: 'line-through' },
-  row: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chip: {
+  scroll: { padding: 16, paddingBottom: 40 },
+  container: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
+  title: { fontSize: 20, fontWeight: '700', color: colors.navy, marginBottom: 16 },
+  center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
+  emptyText: { color: colors.inkSoft, fontSize: 15, marginBottom: 16 },
+  emptyButton: {
     borderWidth: 1,
     borderColor: colors.ocean,
     borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
   },
-  chipModo: { flex: 1, alignItems: 'center' },
-  chipAtivo: { backgroundColor: colors.ocean },
-  chipText: { color: colors.ocean, fontWeight: '700' },
-  chipTextAtivo: { color: colors.white },
-  contagem: { textAlign: 'center', color: colors.inkSoft, marginTop: 16, marginBottom: 8 },
+  emptyButtonText: { color: colors.ocean, fontWeight: '700' },
+
+  resumoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  resumoChip: {
+    flexGrow: 1,
+    flexBasis: 130,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: 'center',
+    ...cardShadow,
+  },
+  resumoNumero: { fontSize: 22, fontWeight: '800', color: colors.navy },
+  resumoNumeroTexto: { fontSize: 14, fontWeight: '800', color: colors.navy },
+  resumoLabel: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
+
+  colunas: { flexDirection: 'column', gap: 16 },
+  colunasLargo: { flexDirection: 'row', alignItems: 'flex-start' },
+  colEsquerda: { width: '100%' },
+  colEsquerdaLargo: { flex: 1 },
+  colDireita: { width: '100%' },
+  colDireitaLargo: { width: 320 },
+  colDireitaSticky: { position: 'sticky', top: 16 },
+
+  colHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  colHeaderAcoes: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionLabel: { fontSize: 14, fontWeight: '700', color: colors.ink },
+  linkAcao: { fontSize: 12, color: colors.ocean, fontWeight: '700' },
+  separadorAcao: { color: colors.inkSoft, fontSize: 12 },
+
+  gridJogadores: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  jogadorCard: {
+    flexGrow: 1,
+    flexBasis: 140,
+    maxWidth: 180,
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  jogadorCardAtivo: { borderColor: colors.ocean, ...cardShadow },
+  jogadorCardInativo: { borderColor: colors.border, opacity: 0.55 },
+  jogadorTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  avatarInativo: { backgroundColor: colors.inkSoft },
+  avatarText: { color: colors.white, fontWeight: '700', fontSize: 12 },
+  jogadorNome: { fontSize: 14, fontWeight: '700', color: colors.ink, marginTop: 8 },
+  jogadorPosicao: { fontSize: 11, color: colors.inkSoft, marginTop: 1, marginBottom: 6 },
+  textoInativo: { textDecorationLine: 'line-through' },
+  pontosRow: { flexDirection: 'row', gap: 3 },
+  ponto: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
+  pontoAtivo: { backgroundColor: colors.sun },
+  pontoInativo: { backgroundColor: colors.inkSoft },
+
+  painelCard: { backgroundColor: colors.white, borderRadius: 16, padding: 16, ...cardShadow },
+  row: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  numeroChip: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.ocean,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  numeroChipAtivo: { backgroundColor: colors.ocean },
+  numeroChipText: { color: colors.ocean, fontWeight: '700' },
+  numeroChipTextAtivo: { color: colors.white },
+
+  modoRow: { flexDirection: 'row', gap: 8 },
+  modoCard: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  modoCardAtivo: { borderColor: colors.ocean, backgroundColor: colors.oceanTint },
+  modoEmoji: { fontSize: 18, marginBottom: 4 },
+  modoTexto: { fontSize: 12, fontWeight: '700', color: colors.inkSoft },
+  modoTextoAtivo: { color: colors.ocean },
+
+  composicaoLinha: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  composicaoTexto: { fontSize: 13, color: colors.ink },
+  composicaoTextoAlerta: { color: colors.coral, fontWeight: '600' },
+
+  avisoBox: {
+    backgroundColor: colors.coralTint,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
+  },
+  avisoTexto: { color: colors.coral, fontSize: 12, fontWeight: '600' },
+
   button: {
-    width: '100%',
     backgroundColor: colors.ocean,
-    borderRadius: 999,
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 16,
   },
-  buttonSecundario: { backgroundColor: colors.navy, marginTop: 16 },
+  buttonSecundario: { backgroundColor: colors.navy, marginTop: 0 },
   buttonText: { color: colors.white, fontWeight: '700', fontSize: 16 },
-  resultado: { marginTop: 20 },
-  timeCard: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 12 },
+
+  resultado: { marginTop: 24 },
+  resultadoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 16 },
+  timeCard: {
+    flexGrow: 1,
+    flexBasis: 220,
+    maxWidth: 320,
+    backgroundColor: colors.white,
+    borderRadius: 14,
+    padding: 14,
+    ...cardShadow,
+  },
   timeTitulo: { fontSize: 15, fontWeight: '700', color: colors.navy, marginBottom: 6 },
   timeJogador: { fontSize: 13, color: colors.ink, marginBottom: 2 },
+  timeAviso: { fontSize: 12, color: colors.coral, fontWeight: '700', marginTop: 8 },
+  timeCompleto: { fontSize: 12, color: colors.success, fontWeight: '700', marginTop: 8 },
 });

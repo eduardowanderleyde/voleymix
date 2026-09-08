@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { signInWithGoogle } from '../config/googleAuth';
+import { garantirPerfilUsuario } from '../utils/perfil';
 import { colors } from '../theme';
-import FormScreen from '../components/FormScreen';
+import AuthScreen from '../components/AuthScreen';
+import AuthCardHeader from '../components/AuthCardHeader';
+import AuthField from '../components/AuthField';
+import GoogleSignInButton from '../components/GoogleSignInButton';
+import AuthFooter from '../components/AuthFooter';
+import { authStyles as styles } from './authSharedStyles';
 
 export default function SignupScreen({ navigation }) {
   const [nome, setNome] = useState('');
@@ -20,6 +20,24 @@ export default function SignupScreen({ navigation }) {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
+  const [carregandoGoogle, setCarregandoGoogle] = useState(false);
+
+  async function handleGoogle() {
+    setErro('');
+    setCarregandoGoogle(true);
+    try {
+      await signInWithGoogle();
+      if (auth.currentUser) {
+        await garantirPerfilUsuario(auth.currentUser);
+      }
+    } catch (e) {
+      if (e.code !== 'auth/popup-closed-by-user' && e.code !== '12501') {
+        setErro('Não foi possível continuar com o Google.');
+      }
+    } finally {
+      setCarregandoGoogle(false);
+    }
+  }
 
   async function handleCriarConta() {
     setErro('');
@@ -60,39 +78,33 @@ export default function SignupScreen({ navigation }) {
   }
 
   return (
-    <FormScreen contentStyle={styles.center}>
+    <AuthScreen>
       <View style={styles.card}>
-        <Text style={styles.title}>🏐 Criar conta</Text>
+        <AuthCardHeader subtitle="Crie sua conta para começar" />
 
-        <TextInput
-          style={styles.input}
-          placeholder="Nome"
-          placeholderTextColor={colors.inkSoft}
-          value={nome}
-          onChangeText={setNome}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.inkSoft}
+        <AuthField label="Nome" icon="user" placeholder="Seu nome" value={nome} onChangeText={setNome} />
+        <AuthField
+          label="E-mail"
+          icon="mail"
+          placeholder="seu@email.com"
           autoCapitalize="none"
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Senha (mínimo 6 caracteres)"
-          placeholderTextColor={colors.inkSoft}
-          secureTextEntry
+        <AuthField
+          label="Senha"
+          icon="lock"
+          secure
+          placeholder="Mínimo 6 caracteres"
           value={senha}
           onChangeText={setSenha}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Confirmar senha"
-          placeholderTextColor={colors.inkSoft}
-          secureTextEntry
+        <AuthField
+          label="Confirmar senha"
+          icon="lock"
+          secure
+          placeholder="Repita a senha"
           value={confirmarSenha}
           onChangeText={setConfirmarSenha}
         />
@@ -107,39 +119,10 @@ export default function SignupScreen({ navigation }) {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.link}>Já tem conta? Entrar</Text>
-        </TouchableOpacity>
+        <GoogleSignInButton onPress={handleGoogle} loading={carregandoGoogle} />
+
+        <AuthFooter prompt="Já tem conta?" actionLabel="Entrar" onPress={() => navigation.navigate('Login')} />
       </View>
-    </FormScreen>
+    </AuthScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  center: { justifyContent: 'center', alignItems: 'center' },
-  card: { width: '100%', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: '700', color: colors.navy, marginBottom: 24 },
-  input: {
-    width: '100%',
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E4DFCF',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
-    color: colors.ink,
-  },
-  erro: { color: colors.coral, marginBottom: 12, textAlign: 'center' },
-  button: {
-    width: '100%',
-    backgroundColor: colors.ocean,
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  buttonText: { color: colors.white, fontWeight: '700', fontSize: 16 },
-  link: { color: colors.ocean, fontWeight: '600' },
-});

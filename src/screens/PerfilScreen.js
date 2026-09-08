@@ -1,16 +1,24 @@
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { signOut } from 'firebase/auth';
+import Feather from '@expo/vector-icons/Feather';
 import { auth } from '../config/firebase';
-import { colors } from '../theme';
+import { colors, cardShadow } from '../theme';
 import Screen from '../components/Screen';
+import VolleyballLogo from '../components/VolleyballLogo';
 
 export default function PerfilScreen() {
+  const user = auth.currentUser;
+  const nome = user?.displayName;
+
   return (
-    <Screen edges={['top']}>
-      <View style={styles.container}>
-        <Text style={styles.title}>👤 Meu perfil</Text>
-        <Text style={styles.email}>{auth.currentUser?.email}</Text>
+    <Screen edges={['bottom']} style={styles.center}>
+      <View style={styles.card}>
+        <VolleyballLogo size={64} />
+        <Text style={styles.title}>{nome || 'Meu perfil'}</Text>
+        <Text style={styles.email}>{user?.email}</Text>
+
         <TouchableOpacity style={styles.logoutButton} onPress={() => signOut(auth)}>
+          <Feather name="log-out" size={16} color={colors.white} />
           <Text style={styles.logoutText}>Sair</Text>
         </TouchableOpacity>
       </View>
@@ -19,9 +27,26 @@ export default function PerfilScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', padding: 24 },
-  title: { fontSize: 24, fontWeight: '700', color: colors.navy, marginBottom: 4 },
-  email: { color: colors.inkSoft, marginBottom: 24 },
-  logoutButton: { backgroundColor: colors.coral, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 999 },
-  logoutText: { color: colors.white, fontWeight: '700' },
+  center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    padding: 32,
+    ...cardShadow,
+  },
+  title: { fontSize: 20, fontWeight: '700', color: colors.navy, marginTop: 14 },
+  email: { color: colors.inkSoft, marginTop: 4, marginBottom: 24 },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.coral,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+  },
+  logoutText: { color: colors.white, fontWeight: '700', fontSize: 15 },
 });

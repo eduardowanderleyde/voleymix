@@ -21,7 +21,7 @@ export function sortearAleatorio(jogadores, numTimes) {
 }
 
 export function sortearBalanceado(jogadores, numTimes) {
-  const ordenados = [...jogadores].sort((a, b) => b.nivel - a.nivel);
+  const ordenados = [...jogadores].sort((a, b) => b.nivelMedio - a.nivelMedio);
   const times = criarTimesVazios(numTimes);
   const somaNiveis = new Array(numTimes).fill(0);
 
@@ -35,7 +35,7 @@ export function sortearBalanceado(jogadores, numTimes) {
       }
     }
     times[alvo].push(jogador);
-    somaNiveis[alvo] += jogador.nivel;
+    somaNiveis[alvo] += jogador.nivelMedio;
   });
 
   return times;
@@ -46,4 +46,52 @@ export function sortearTimes(jogadores, numTimes, modo) {
     return sortearBalanceado(jogadores, numTimes);
   }
   return sortearAleatorio(jogadores, numTimes);
+}
+
+export const FORMACAO_IDEAL = { levantador: 1, oposto: 1, ponteiro: 2, central: 2 };
+
+function contarPosicoes(jogadores) {
+  const contagem = {};
+  let curingas = 0;
+
+  jogadores.forEach((jogador) => {
+    if (jogador.posicao === 'qualquer') {
+      curingas += 1;
+    } else if (jogador.posicao in FORMACAO_IDEAL) {
+      contagem[jogador.posicao] = (contagem[jogador.posicao] || 0) + 1;
+    }
+  });
+
+  return { contagem, curingas };
+}
+
+function calcularFaltas(contagem, curingas, idealPorPosicao) {
+  const faltas = Object.entries(idealPorPosicao)
+    .map(([posicao, ideal]) => ({ posicao, falta: ideal - (contagem[posicao] || 0) }))
+    .filter(({ falta }) => falta > 0);
+
+  let curingasRestantes = curingas;
+  return faltas
+    .map(({ posicao, falta }) => {
+      const cobertoPorCuringa = Math.min(falta, curingasRestantes);
+      curingasRestantes -= cobertoPorCuringa;
+      return { posicao, falta: falta - cobertoPorCuringa };
+    })
+    .filter(({ falta }) => falta > 0);
+}
+
+export function posicoesFaltando(time) {
+  const { contagem, curingas } = contarPosicoes(time);
+  return calcularFaltas(contagem, curingas, FORMACAO_IDEAL);
+}
+
+// Mesma lógica de posicoesFaltando, mas olhando pro conjunto inteiro de
+// presentes e multiplicando a formação ideal pela quantidade de times —
+// serve pra avisar antes de sortear se dá pra fechar todo mundo completo.
+export function faltasGlobais(jogadores, numTimes) {
+  const { contagem, curingas } = contarPosicoes(jogadores);
+  const idealTotal = Object.fromEntries(
+    Object.entries(FORMACAO_IDEAL).map(([posicao, ideal]) => [posicao, ideal * numTimes])
+  );
+  return calcularFaltas(contagem, curingas, idealTotal);
 }

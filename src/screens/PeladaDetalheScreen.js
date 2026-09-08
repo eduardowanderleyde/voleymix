@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, ScrollView } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { colors } from '../theme';
+import { colors, cardShadow } from '../theme';
 import Screen from '../components/Screen';
 
 const MODO_LABEL = { balanceado: '⚖️ Balanceado', aleatorio: '🎲 Aleatório' };
@@ -31,7 +31,7 @@ export default function PeladaDetalheScreen() {
             <Text style={styles.timeTitulo}>Time {i + 1}</Text>
             {time.map((j) => (
               <Text key={j.id} style={styles.jogador}>
-                {j.nome} — nível {j.nivel}
+                {j.nome} — nível {j.nivelMedio}
               </Text>
             ))}
           </View>
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
   data: { fontSize: 18, fontWeight: '700', color: colors.navy },
   meta: { fontSize: 14, color: colors.inkSoft, marginBottom: 16 },
-  timeCard: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 12 },
+  timeCard: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 12, ...cardShadow },
   timeTitulo: { fontSize: 15, fontWeight: '700', color: colors.navy, marginBottom: 6 },
   jogador: { fontSize: 14, color: colors.ink, marginBottom: 2 },
 });
