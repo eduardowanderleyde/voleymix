@@ -1,4 +1,4 @@
-# Vôlei Mix
+# VoleiTeam
 
 App pra organizar peladas de vôlei: cadastra os jogadores com as 6 habilidades
 do vôlei (saque, recepção, levantamento, ataque, bloqueio, defesa) e posição,
@@ -37,6 +37,10 @@ tela.
 ## Firebase
 
 Projeto: `voley-mix` (console em https://console.firebase.google.com/project/voley-mix).
+O app se chama **VoleiTeam** agora, mas o id do projeto Firebase, o bundle id
+(`com.voleymix.app`) e o slug do Expo continuam com o codinome antigo —
+trocar isso exigiria recriar o projeto/registrar os apps de novo no Firebase
+e no Google Sign-In, então deixei como está.
 
 **Passos manuais no console** (só quem tem acesso à conta consegue fazer):
 

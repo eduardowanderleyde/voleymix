@@ -17,14 +17,17 @@ async function clicar(page, texto) {
 }
 
 async function preencherPorLabel(page, label, valor) {
-  await page
-    .locator('text=' + JSON.stringify(label))
-    .last()
-    .locator('xpath=following-sibling::*[1]//input')
-    .fill(valor);
+  const rotulos = await page.locator('text=' + JSON.stringify(label)).all();
+  for (const rotulo of rotulos) {
+    if (await rotulo.isVisible()) {
+      await rotulo.locator('xpath=following-sibling::*[1]//input').fill(valor);
+      return;
+    }
+  }
+  throw new Error(`Nenhum campo visível com o rótulo "${label}"`);
 }
 
-test.describe('Vôlei Mix', () => {
+test.describe('VoleiTeam', () => {
   test('cadastro → sorteio com opções → resultado → avaliação → histórico', async ({ page }) => {
     const email = `e2e-${Date.now()}@voleymix.test`;
     const senha = 'senha123456';

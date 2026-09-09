@@ -2,15 +2,17 @@ import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
-import { auth } from '../config/firebase';
 import { colors } from '../theme';
 import VolleyballLogo from './VolleyballLogo';
 import { iniciais } from '../utils/iniciais';
+import { useAuthUser } from '../hooks/useAuthUser';
+import { useMeuPerfil } from '../hooks/useMeuPerfil';
 
 export default function AppHeader() {
   const navigation = useNavigation();
-  const user = auth.currentUser;
-  const nome = user?.displayName || user?.email || 'Usuário';
+  const user = useAuthUser();
+  const perfil = useMeuPerfil();
+  const nome = perfil?.nome || user?.displayName || user?.email || 'Usuário';
 
   return (
     <SafeAreaView edges={['top']} style={styles.safe}>
@@ -19,8 +21,8 @@ export default function AppHeader() {
           <VolleyballLogo size={32} />
           <View style={styles.brandTextWrap}>
             <Text style={styles.brandTitle}>
-              <Text style={styles.brandDark}>Voley</Text>
-              <Text style={styles.brandLight}>Mix</Text>
+              <Text style={styles.brandDark}>Volei</Text>
+              <Text style={styles.brandLight}>Team</Text>
             </Text>
             <Text style={styles.tagline} numberOfLines={1}>
               Mais que um jogo, uma conexão.

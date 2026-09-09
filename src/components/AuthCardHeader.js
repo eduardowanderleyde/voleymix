@@ -7,8 +7,8 @@ export default function AuthCardHeader({ subtitle }) {
     <>
       <VolleyballLogo size={72} />
       <Text style={styles.brand}>
-        <Text style={styles.brandDark}>Voley</Text>
-        <Text style={styles.brandLight}>Mix</Text>
+        <Text style={styles.brandDark}>Volei</Text>
+        <Text style={styles.brandLight}>Team</Text>
       </Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
     </>

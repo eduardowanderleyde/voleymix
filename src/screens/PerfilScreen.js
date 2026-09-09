@@ -5,10 +5,13 @@ import { auth } from '../config/firebase';
 import { colors, cardShadow } from '../theme';
 import Screen from '../components/Screen';
 import VolleyballLogo from '../components/VolleyballLogo';
+import { useAuthUser } from '../hooks/useAuthUser';
+import { useMeuPerfil } from '../hooks/useMeuPerfil';
 
 export default function PerfilScreen() {
-  const user = auth.currentUser;
-  const nome = user?.displayName;
+  const user = useAuthUser();
+  const perfil = useMeuPerfil();
+  const nome = perfil?.nome || user?.displayName;
 
   return (
     <Screen edges={['bottom']} style={styles.center}>

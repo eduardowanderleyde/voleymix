@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { signInWithGoogle } from '../config/googleAuth';
@@ -58,6 +58,9 @@ export default function SignupScreen({ navigation }) {
     setCarregando(true);
     try {
       const credential = await createUserWithEmailAndPassword(auth, email.trim(), senha);
+      // Sem isso, auth.currentUser.displayName fica sempre vazio pra quem
+      // entra por e-mail/senha, e o header/perfil caem no fallback do e-mail.
+      await updateProfile(credential.user, { displayName: nome.trim() });
       await setDoc(doc(db, 'users', credential.user.uid), {
         uid: credential.user.uid,
         nome: nome.trim(),
