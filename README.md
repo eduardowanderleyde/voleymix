@@ -89,6 +89,58 @@ em `firestore.rules`).
 
 ## Próximos passos / ideias em aberto
 
+Ordem de prioridade combinada na última revisão de UI (a mais recente manda
+nessa lista — o veredito foi "Jogadores e Sorteio já estão bons, o que mais
+destoa agora é Detalhe da pelada"):
+
+1. [ ] **Reformular `PeladaDetalheScreen`** — hoje é a tela mais fraca
+       visualmente: sem container `maxWidth`, sem fundo esportivo, cards de
+       time em linhas gigantes sem posição/nível, botão "Avaliar jogadores"
+       esticando a tela inteira. Reaproveitar o mesmo cartão de time que o
+       resultado do Sorteio usa (posição+nível em etiqueta, média no título,
+       cor por time) — vale extrair um componente `TimeCard` compartilhado
+       entre `SorteioScreen` e `PeladaDetalheScreen` em vez de duplicar.
+       Adicionar opção **Empate** além de "Time N venceu" (hoje só marca um
+       vencedor, não cobre resultado empatado).
+2. [ ] **Trocar `mostrarAlerta`/`window.alert` por notificação in-app** pelo
+       menos nas confirmações de sucesso (ex: "Pelada salva no histórico!") —
+       hoje é o alerta nativo do navegador, destoa do resto do visual. Um
+       toast simples (some sozinho em ~3s, sem botão OK) resolve.
+3. [ ] **Uso do jogador "Qualquer" no sorteio balanceado não fica explícito**
+       — o algoritmo em `sortearBalanceado` (`src/utils/sorteio.js`) já prioriza
+       posição → coringa → nível, mas quando um curinga cobre uma posição
+       faltante isso não aparece na tela: ele continua listado como
+       "Qualquer" e o time pode aparecer como incompleto mesmo com o coringa
+       ali. Falta marcar no resultado algo como "Lucas — Central (adaptado)"
+       quando isso acontecer.
+4. [ ] **Card do Histórico com mais informação** — hoje é só data/times/modo.
+       Adicionar contagem de jogadores e ações diretas (**Ver times**,
+       **Repetir sorteio**, **Excluir**). O ranking "mais presentes/mais
+       vitórias" não faz sentido com poucas peladas salvas (tudo empatado em
+       "1x") — só mostrar depois de um mínimo de peladas (3, por exemplo),
+       com uma mensagem tipo "Mais estatísticas disponíveis após 3 peladas"
+       antes disso.
+5. [ ] Reduzir mais a opacidade do fundo esportivo (`AuthBackground.js`) —
+       já foi cortado uma vez (`<G opacity={0.7}>` em volta de tudo) mas
+       ainda compete com os cards em telas com bastante conteúdo (Jogadores).
+6. [ ] Conferir `paddingBottom` do conteúdo rolável em todas as telas com
+       aba inferior (Sessões/Sorteio/Jogadores/Histórico) — a barra de abas
+       não pode cobrir o fim da lista.
+
+Menores, sem prioridade definida ainda:
+
+- [ ] Filtro por nível (iniciante/intermediário/avançado) na aba Jogadores,
+      além do filtro por posição que já existe
+- [ ] Deixar claro o critério de "atacantes"/"defensores" nos indicadores
+      da aba Jogadores (hoje é ponteiro+oposto / central+líbero, mas não é
+      óbvio pra quem olha só o número)
+- [ ] Botões de editar/excluir jogador são pequenos — aumentar a área de
+      toque
+- [ ] Painel lateral do Sorteio (config + composição) não fica claramente
+      fixo durante a rolagem em telas largas — `position: sticky` está
+      aplicado mas precisa de teste visual real num navegador
+- [ ] Quando as 3 opções de sorteio empatam na diferença de nível, mostrar
+      outro critério de comparação entre elas (hoje ficam indistinguíveis)
 - [ ] Testar o login com Google de verdade num build de desenvolvimento
       (apps já registrados no Firebase, falta só `expo prebuild` + rodar)
 - [ ] Ícone e splash personalizados (hoje é o padrão do Expo)

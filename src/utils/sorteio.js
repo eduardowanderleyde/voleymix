@@ -20,22 +20,79 @@ export function sortearAleatorio(jogadores, numTimes) {
   return times;
 }
 
+// jogador.nivelMedio pode não existir (dado antigo/incompleto) — sem esse
+// fallback, a soma vira NaN e QUALQUER comparação com NaN é falsa, o que
+// travava `alvo` sempre em 0 e jogava todo mundo no primeiro time.
+function nivelOuPadrao(jogador) {
+  return jogador.nivelMedio ?? 3;
+}
+
+// Prioridade do balanceamento, nessa ordem:
+//   1. Espalhar cada posição específica entre os times (ninguém deveria
+//      ficar sem levantador/central/etc. enquanto outro time acumula).
+//   2. Usar os jogadores "Qualquer" pra tapar os buracos de posição que
+//      sobrarem (time com maior carência recebe primeiro).
+//   3. Só then usar o nível pra desempatar quem vai pra onde.
 export function sortearBalanceado(jogadores, numTimes) {
-  const ordenados = [...jogadores].sort((a, b) => b.nivelMedio - a.nivelMedio);
   const times = criarTimesVazios(numTimes);
+  const contagemPosicao = Array.from({ length: numTimes }, () => ({}));
   const somaNiveis = new Array(numTimes).fill(0);
 
-  ordenados.forEach((jogador) => {
+  function melhorTimePara(posicao) {
     let alvo = 0;
     for (let i = 1; i < numTimes; i++) {
-      const menorSoma = somaNiveis[i] < somaNiveis[alvo];
-      const somaIgualMenosGente = somaNiveis[i] === somaNiveis[alvo] && times[i].length < times[alvo].length;
-      if (menorSoma || somaIgualMenosGente) {
+      const contAtual = contagemPosicao[i][posicao] || 0;
+      const contAlvo = contagemPosicao[alvo][posicao] || 0;
+      const menosDessaPosicao = contAtual < contAlvo;
+      const empatePosicaoMenorNivel = contAtual === contAlvo && somaNiveis[i] < somaNiveis[alvo];
+      const empateTudoMenosGente =
+        contAtual === contAlvo && somaNiveis[i] === somaNiveis[alvo] && times[i].length < times[alvo].length;
+      if (menosDessaPosicao || empatePosicaoMenorNivel || empateTudoMenosGente) {
         alvo = i;
       }
     }
-    times[alvo].push(jogador);
-    somaNiveis[alvo] += jogador.nivelMedio;
+    return alvo;
+  }
+
+  function atribuir(jogador, time) {
+    times[time].push(jogador);
+    contagemPosicao[time][jogador.posicao] = (contagemPosicao[time][jogador.posicao] || 0) + 1;
+    somaNiveis[time] += nivelOuPadrao(jogador);
+  }
+
+  const porPosicao = {};
+  const curingas = [];
+  jogadores.forEach((jogador) => {
+    if (jogador.posicao === 'qualquer') {
+      curingas.push(jogador);
+    } else {
+      porPosicao[jogador.posicao] = porPosicao[jogador.posicao] || [];
+      porPosicao[jogador.posicao].push(jogador);
+    }
+  });
+
+  Object.values(porPosicao).forEach((lista) => {
+    lista.sort((a, b) => nivelOuPadrao(b) - nivelOuPadrao(a));
+    lista.forEach((jogador) => atribuir(jogador, melhorTimePara(jogador.posicao)));
+  });
+
+  curingas.sort((a, b) => nivelOuPadrao(b) - nivelOuPadrao(a));
+  curingas.forEach((curinga) => {
+    let alvo = 0;
+    let maiorCarencia = -1;
+    for (let i = 0; i < numTimes; i++) {
+      const carencia = Object.entries(FORMACAO_IDEAL).reduce(
+        (soma, [posicao, ideal]) => soma + Math.max(0, ideal - (contagemPosicao[i][posicao] || 0)),
+        0
+      );
+      const maisCarente = carencia > maiorCarencia;
+      const empateMenorNivel = carencia === maiorCarencia && somaNiveis[i] < somaNiveis[alvo];
+      if (maisCarente || empateMenorNivel) {
+        maiorCarencia = carencia;
+        alvo = i;
+      }
+    }
+    atribuir(curinga, alvo);
   });
 
   return times;
@@ -48,13 +105,18 @@ export function sortearTimes(jogadores, numTimes, modo) {
   return sortearAleatorio(jogadores, numTimes);
 }
 
-function somaNivel(time) {
-  return time.reduce((soma, j) => soma + (j.nivelMedio ?? 0), 0);
+function mediaNivel(time) {
+  if (!time.length) return 0;
+  return time.reduce((soma, j) => soma + nivelOuPadrao(j), 0) / time.length;
 }
 
+// Diferença entre a média de nível do time mais forte e do mais fraco — o
+// mesmo número que "média X,X" mostra por time, pra bater com o que a tela
+// exibe (antes comparava a SOMA dos times, que não tem o mesmo significado
+// quando os times têm o mesmo tamanho mas a UI já fala em média).
 export function diferencaNivel(times) {
-  const somas = times.map(somaNivel);
-  return Math.max(...somas) - Math.min(...somas);
+  const medias = times.map(mediaNivel);
+  return Math.max(...medias) - Math.min(...medias);
 }
 
 function assinatura(times) {

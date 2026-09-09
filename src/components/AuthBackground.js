@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Rect } from 'react-native-svg';
 import { colors } from '../theme';
 
 export default function AuthBackground() {
@@ -10,6 +10,9 @@ export default function AuthBackground() {
       preserveAspectRatio="xMidYMid slice"
     >
       <Rect x={0} y={0} width={400} height={800} fill={colors.sand} />
+      {/* As marcações de quadra ficam a 70% da opacidade original pra não
+          disputar atenção com os cards de conteúdo por cima. */}
+      <G opacity={0.7}>
 
       <Circle cx={30} cy={80} r={160} fill={colors.ocean} opacity={0.1} />
       <Circle cx={370} cy={700} r={190} fill={colors.ocean} opacity={0.08} />
@@ -54,6 +57,7 @@ export default function AuthBackground() {
       <Line x1={72} y1={430} x2={110} y2={800} stroke={colors.ocean} strokeWidth={1} strokeDasharray="4,7" opacity={0.2} />
       <Line x1={328} y1={430} x2={290} y2={800} stroke={colors.ocean} strokeWidth={1} strokeDasharray="4,7" opacity={0.2} />
       <Line x1={380} y1={430} x2={392} y2={800} stroke={colors.ocean} strokeWidth={1} strokeDasharray="4,7" opacity={0.2} />
+      </G>
     </Svg>
   );
 }

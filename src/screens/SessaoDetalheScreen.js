@@ -134,7 +134,8 @@ export default function SessaoDetalheScreen() {
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.buttonPrimario} onPress={irParaSorteio}>
-            <Text style={styles.buttonPrimarioText}>🔀 Sortear times</Text>
+            <Feather name="shuffle" size={16} color={colors.white} />
+            <Text style={styles.buttonPrimarioText}>Sortear times</Text>
           </TouchableOpacity>
         </View>
 
@@ -200,7 +201,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonSecundarioText: { color: colors.ocean, fontWeight: '700' },
-  buttonPrimario: { flex: 1, backgroundColor: colors.ocean, borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
+  buttonPrimario: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: colors.ocean,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
   buttonPrimarioText: { color: colors.white, fontWeight: '700' },
   peladaCard: {
     flexDirection: 'row',

@@ -79,7 +79,7 @@ export default function NovoJogadorScreen() {
   return (
     <FormScreen>
       <View style={styles.card}>
-        <Text style={styles.title}>{jogadorExistente ? '✏️ Editar jogador' : '🏐 Novo jogador'}</Text>
+        <Text style={styles.title}>{jogadorExistente ? 'Editar jogador' : 'Novo jogador'}</Text>
 
         <TextInput
           style={styles.input}

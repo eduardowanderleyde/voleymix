@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,6 +15,8 @@ import Feather from '@expo/vector-icons/Feather';
 import { auth, db } from '../config/firebase';
 import { colors, POSICOES, POSICAO_LABEL_PLURAL, cardShadow } from '../theme';
 import Screen from '../components/Screen';
+import AuthBackground from '../components/AuthBackground';
+import EmptyState from '../components/EmptyState';
 import { gerarSugestoes, posicoesFaltando, faltasGlobais, FORMACAO_IDEAL } from '../utils/sorteio';
 import { mostrarAlerta } from '../utils/alerta';
 import { compartilharTimes } from '../utils/compartilhar';
@@ -24,6 +26,7 @@ import { useMinhaColecao } from '../hooks/useMinhaColecao';
 const POSICAO_LABEL = Object.fromEntries(POSICOES.map((p) => [p.value, p.label]));
 const MIN_TIMES = 2;
 const MAX_TIMES = 6;
+const CORES_TIME = [colors.ocean, colors.sun, colors.coral, colors.navy, colors.success, colors.inkSoft];
 
 export default function SorteioScreen() {
   const navigation = useNavigation();
@@ -57,15 +60,38 @@ export default function SorteioScreen() {
 
   const listaPresentes = useMemo(() => jogadores.filter((j) => presentes[j.id]), [jogadores, presentes]);
 
+  const avisoFaltando = useMemo(() => faltasGlobais(listaPresentes, numTimes), [listaPresentes, numTimes]);
+
+  // A lista abaixo usa o mesmo resultado de faltasGlobais (que já desconta os
+  // curingas) pra decidir o ✓/⚠ de cada posição — assim a linha nunca
+  // contradiz o aviso final embaixo.
   const composicao = useMemo(() => {
+    const faltando = new Set(avisoFaltando.map((f) => f.posicao));
     return POSICOES.map((p) => {
       const count = listaPresentes.filter((j) => j.posicao === p.value).length;
       const necessario = (FORMACAO_IDEAL[p.value] || 0) * numTimes;
-      return { posicao: p.value, label: POSICAO_LABEL_PLURAL[p.value], count, ok: count >= necessario };
+      return {
+        posicao: p.value,
+        label: POSICAO_LABEL_PLURAL[p.value],
+        count,
+        necessario,
+        ok: !faltando.has(p.value),
+      };
     });
-  }, [listaPresentes, numTimes]);
+  }, [listaPresentes, numTimes, avisoFaltando]);
 
-  const avisoFaltando = useMemo(() => faltasGlobais(listaPresentes, numTimes), [listaPresentes, numTimes]);
+  const curingasPresentes = useMemo(
+    () => listaPresentes.filter((j) => j.posicao === 'qualquer').length,
+    [listaPresentes]
+  );
+
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (sugestoes) {
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    }
+  }, [sugestoes]);
 
   function selecionarTodos(valor) {
     const novo = {};
@@ -131,26 +157,24 @@ export default function SorteioScreen() {
 
   return (
     <Screen edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <AuthBackground />
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
         <View style={styles.container}>
-          <Text style={styles.title}>🔀 {sessao ? sessao.titulo : 'Sortear times'}</Text>
+          <Text style={styles.title}>{sessao ? sessao.titulo : 'Sortear times'}</Text>
 
           {carregando ? (
             <View style={styles.center}>
               <ActivityIndicator color={colors.ocean} />
             </View>
           ) : jogadores.length === 0 ? (
-            <View style={styles.center}>
-              <Text style={styles.emptyText}>
-                Cadastre jogadores antes de sortear os times.
-              </Text>
-              <TouchableOpacity
-                style={styles.emptyButton}
-                onPress={() => navigation.navigate('Jogadores')}
-              >
-                <Text style={styles.emptyButtonText}>Ir para Jogadores</Text>
-              </TouchableOpacity>
-            </View>
+            <EmptyState
+              icon="users"
+              title="Nenhum jogador cadastrado"
+              description="Cadastre os jogadores da sua pelada antes de sortear os times."
+              buttonLabel="Ir para Jogadores"
+              buttonIcon="arrow-right"
+              onPress={() => navigation.navigate('Jogadores')}
+            />
           ) : (
             <>
               <View style={styles.resumoRow}>
@@ -167,9 +191,12 @@ export default function SorteioScreen() {
                   <Text style={styles.resumoLabel}>por time</Text>
                 </View>
                 <View style={styles.resumoChip}>
-                  <Text style={styles.resumoNumeroTexto}>
-                    {modo === 'balanceado' ? '⚖️ Balanceado' : '🎲 Aleatório'}
-                  </Text>
+                  <View style={styles.resumoModoRow}>
+                    <Feather name={modo === 'balanceado' ? 'sliders' : 'shuffle'} size={14} color={colors.navy} />
+                    <Text style={styles.resumoNumeroTexto}>
+                      {modo === 'balanceado' ? 'Balanceado' : 'Aleatório'}
+                    </Text>
+                  </View>
                   <Text style={styles.resumoLabel}>modo</Text>
                 </View>
               </View>
@@ -220,16 +247,21 @@ export default function SorteioScreen() {
                           <Text style={[styles.jogadorPosicao, !ativo && styles.textoInativo]}>
                             {POSICAO_LABEL[item.posicao] || item.posicao}
                           </Text>
-                          <View style={styles.pontosRow}>
-                            {[1, 2, 3, 4, 5].map((n) => (
-                              <View
-                                key={n}
-                                style={[
-                                  styles.ponto,
-                                  n <= (item.nivelMedio ?? 0) && (ativo ? styles.pontoAtivo : styles.pontoInativo),
-                                ]}
-                              />
-                            ))}
+                          <View style={styles.pontosLinha}>
+                            <View style={styles.pontosRow}>
+                              {[1, 2, 3, 4, 5].map((n) => (
+                                <View
+                                  key={n}
+                                  style={[
+                                    styles.ponto,
+                                    n <= (item.nivelMedio ?? 0) && (ativo ? styles.pontoAtivo : styles.pontoInativo),
+                                  ]}
+                                />
+                              ))}
+                            </View>
+                            <Text style={[styles.nivelTexto, !ativo && styles.textoInativo]}>
+                              Nível {item.nivelMedio ?? 3}
+                            </Text>
                           </View>
                         </TouchableOpacity>
                       );
@@ -269,7 +301,12 @@ export default function SorteioScreen() {
                         style={[styles.modoCard, modo === 'balanceado' && styles.modoCardAtivo]}
                         onPress={() => setModo('balanceado')}
                       >
-                        <Text style={styles.modoEmoji}>⚖️</Text>
+                        <Feather
+                          name="sliders"
+                          size={18}
+                          color={modo === 'balanceado' ? colors.ocean : colors.inkSoft}
+                          style={styles.modoIcone}
+                        />
                         <Text style={[styles.modoTexto, modo === 'balanceado' && styles.modoTextoAtivo]}>
                           Balanceado
                         </Text>
@@ -278,7 +315,12 @@ export default function SorteioScreen() {
                         style={[styles.modoCard, modo === 'aleatorio' && styles.modoCardAtivo]}
                         onPress={() => setModo('aleatorio')}
                       >
-                        <Text style={styles.modoEmoji}>🎲</Text>
+                        <Feather
+                          name="shuffle"
+                          size={18}
+                          color={modo === 'aleatorio' ? colors.ocean : colors.inkSoft}
+                          style={styles.modoIcone}
+                        />
                         <Text style={[styles.modoTexto, modo === 'aleatorio' && styles.modoTextoAtivo]}>
                           Aleatório
                         </Text>
@@ -303,13 +345,20 @@ export default function SorteioScreen() {
 
                     {avisoFaltando.length > 0 && (
                       <View style={styles.avisoBox}>
-                        <Text style={styles.avisoTexto}>
-                          Atenção: falta{' '}
-                          {avisoFaltando
-                            .map((f) => `${f.falta}x ${POSICAO_LABEL[f.posicao]}`)
-                            .join(', ')}{' '}
-                          pra fechar {numTimes} times completos.
-                        </Text>
+                        {avisoFaltando.map((f) => {
+                          const info = composicao.find((c) => c.posicao === f.posicao);
+                          return (
+                            <Text key={f.posicao} style={styles.avisoTexto}>
+                              {POSICAO_LABEL[f.posicao]}: você tem {info.count}, precisa de {info.necessario} pra
+                              fechar {numTimes} times completos.
+                            </Text>
+                          );
+                        })}
+                        {curingasPresentes > 0 && (
+                          <Text style={styles.avisoDica}>
+                            O jogador "Qualquer" já foi considerado como reforço nessas contas.
+                          </Text>
+                        )}
                       </View>
                     )}
 
@@ -350,7 +399,7 @@ export default function SorteioScreen() {
                                 indiceSelecionado === i && styles.opcaoChipTextAtiva,
                               ]}
                             >
-                              diferença {sugestao.diferenca}
+                              diferença de nível: {sugestao.diferenca.toFixed(1)}
                             </Text>
                           )}
                         </TouchableOpacity>
@@ -361,21 +410,43 @@ export default function SorteioScreen() {
                   <View style={styles.resultadoGrid}>
                     {times.map((time, i) => {
                       const faltas = posicoesFaltando(time);
+                      const media = (
+                        time.reduce((soma, j) => soma + (j.nivelMedio ?? 3), 0) / time.length
+                      ).toFixed(1);
                       return (
-                        <View key={i} style={styles.timeCard}>
-                          <Text style={styles.timeTitulo}>Time {i + 1}</Text>
-                          {time.map((j) => (
-                            <Text key={j.id} style={styles.timeJogador}>
-                              {j.nome} — nível {j.nivelMedio}
-                            </Text>
-                          ))}
-                          <Text style={faltas.length ? styles.timeAviso : styles.timeCompleto}>
-                            {faltas.length
-                              ? `⚠️ Faltando: ${faltas
-                                  .map(({ posicao, falta }) => `${falta}x ${POSICAO_LABEL[posicao]}`)
-                                  .join(', ')}`
-                              : '✅ Formação completa'}
+                        <View key={i} style={[styles.timeCard, { borderTopColor: CORES_TIME[i % CORES_TIME.length] }]}>
+                          <Text style={styles.timeTitulo}>
+                            Time {i + 1} <Text style={styles.timeMedia}>— média {media}</Text>
                           </Text>
+                          {time.map((j) => (
+                            <View key={j.id} style={styles.timeJogadorRow}>
+                              <Text style={styles.timeJogador} numberOfLines={1}>
+                                {j.nome}
+                              </Text>
+                              <View style={styles.timeJogadorTags}>
+                                <Text style={styles.timeJogadorTag}>
+                                  {POSICAO_LABEL[j.posicao] || j.posicao}
+                                </Text>
+                                <Text style={[styles.timeJogadorTag, styles.timeJogadorTagNivel]}>
+                                  Nível {j.nivelMedio ?? 3}
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                          <View style={styles.timeStatusRow}>
+                            <Feather
+                              name={faltas.length ? 'alert-triangle' : 'check-circle'}
+                              size={12}
+                              color={faltas.length ? colors.coral : colors.success}
+                            />
+                            <Text style={faltas.length ? styles.timeAviso : styles.timeCompleto}>
+                              {faltas.length
+                                ? `Faltando: ${faltas
+                                    .map(({ posicao, falta }) => `${falta}x ${POSICAO_LABEL[posicao]}`)
+                                    .join(', ')}`
+                                : 'Formação completa'}
+                            </Text>
+                          </View>
                         </View>
                       );
                     })}
@@ -395,7 +466,10 @@ export default function SorteioScreen() {
                       {salvando ? (
                         <ActivityIndicator color={colors.white} />
                       ) : (
-                        <Text style={styles.buttonText}>💾 Salvar no histórico</Text>
+                        <View style={styles.buttonComIcone}>
+                          <Feather name="save" size={16} color={colors.white} />
+                          <Text style={styles.buttonText}>Salvar no histórico</Text>
+                        </View>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -410,19 +484,10 @@ export default function SorteioScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 90 },
   container: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
   title: { fontSize: 20, fontWeight: '700', color: colors.navy, marginBottom: 16 },
   center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyText: { color: colors.inkSoft, fontSize: 15, marginBottom: 16 },
-  emptyButton: {
-    borderWidth: 1,
-    borderColor: colors.ocean,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  emptyButtonText: { color: colors.ocean, fontWeight: '700' },
 
   resumoRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   resumoChip: {
@@ -435,6 +500,7 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   resumoNumero: { fontSize: 22, fontWeight: '800', color: colors.navy },
+  resumoModoRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   resumoNumeroTexto: { fontSize: 14, fontWeight: '800', color: colors.navy },
   resumoLabel: { fontSize: 11, color: colors.inkSoft, marginTop: 2 },
 
@@ -479,7 +545,9 @@ const styles = StyleSheet.create({
   jogadorNome: { fontSize: 14, fontWeight: '700', color: colors.ink, marginTop: 8 },
   jogadorPosicao: { fontSize: 11, color: colors.inkSoft, marginTop: 1, marginBottom: 6 },
   textoInativo: { textDecorationLine: 'line-through' },
+  pontosLinha: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pontosRow: { flexDirection: 'row', gap: 3 },
+  nivelTexto: { fontSize: 10, color: colors.inkSoft, fontWeight: '600' },
   ponto: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   pontoAtivo: { backgroundColor: colors.sun },
   pontoInativo: { backgroundColor: colors.inkSoft },
@@ -509,7 +577,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   modoCardAtivo: { borderColor: colors.ocean, backgroundColor: colors.oceanTint },
-  modoEmoji: { fontSize: 18, marginBottom: 4 },
+  modoIcone: { marginBottom: 4 },
   modoTexto: { fontSize: 12, fontWeight: '700', color: colors.inkSoft },
   modoTextoAtivo: { color: colors.ocean },
 
@@ -523,7 +591,8 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 12,
   },
-  avisoTexto: { color: colors.coral, fontSize: 12, fontWeight: '600' },
+  avisoTexto: { color: colors.coral, fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  avisoDica: { color: colors.coral, fontSize: 11, fontStyle: 'italic', marginTop: 2 },
 
   button: {
     backgroundColor: colors.ocean,
@@ -536,6 +605,7 @@ const styles = StyleSheet.create({
   acoesResultadoRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
   buttonSalvar: { flex: 1, marginTop: 0 },
   buttonCompartilhar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -546,6 +616,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttonCompartilharText: { color: colors.ocean, fontWeight: '700', fontSize: 14 },
+  buttonComIcone: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   buttonText: { color: colors.white, fontWeight: '700', fontSize: 16 },
 
   resultado: { marginTop: 24 },
@@ -567,15 +638,37 @@ const styles = StyleSheet.create({
   resultadoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 16 },
   timeCard: {
     flexGrow: 1,
-    flexBasis: 220,
-    maxWidth: 320,
+    flexBasis: 280,
     backgroundColor: colors.white,
     borderRadius: 14,
+    borderTopWidth: 4,
     padding: 14,
     ...cardShadow,
   },
-  timeTitulo: { fontSize: 15, fontWeight: '700', color: colors.navy, marginBottom: 6 },
-  timeJogador: { fontSize: 13, color: colors.ink, marginBottom: 2 },
-  timeAviso: { fontSize: 12, color: colors.coral, fontWeight: '700', marginTop: 8 },
-  timeCompleto: { fontSize: 12, color: colors.success, fontWeight: '700', marginTop: 8 },
+  timeTitulo: { fontSize: 15, fontWeight: '700', color: colors.navy, marginBottom: 8 },
+  timeMedia: { fontSize: 12, fontWeight: '600', color: colors.inkSoft },
+  timeJogadorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  timeJogador: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.ink },
+  timeJogadorTags: { flexDirection: 'row', gap: 4 },
+  timeJogadorTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.inkSoft,
+    backgroundColor: colors.sand,
+    borderRadius: 999,
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+  },
+  timeJogadorTagNivel: { color: colors.ocean, backgroundColor: colors.oceanTint },
+  timeStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  timeAviso: { fontSize: 12, color: colors.coral, fontWeight: '700' },
+  timeCompleto: { fontSize: 12, color: colors.success, fontWeight: '700' },
 });

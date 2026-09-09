@@ -6,6 +6,8 @@ import Feather from '@expo/vector-icons/Feather';
 import { auth, db } from '../config/firebase';
 import { colors, POSICOES, GRUPO_POSICAO, HABILIDADES, cardShadow, categoriaJogador, calcularNivelMedio } from '../theme';
 import Screen from '../components/Screen';
+import AuthBackground from '../components/AuthBackground';
+import EmptyState from '../components/EmptyState';
 import { mostrarAlerta, confirmarAcao } from '../utils/alerta';
 import { iniciais } from '../utils/iniciais';
 import { useMinhaColecao } from '../hooks/useMinhaColecao';
@@ -30,7 +32,10 @@ const JOGADORES_TESTE = [
 function BarraNota({ label, valor }) {
   return (
     <View style={styles.barraLinha}>
-      <Text style={styles.barraLabel}>{label}</Text>
+      <View style={styles.barraLabelRow}>
+        <Text style={styles.barraLabel}>{label}</Text>
+        <Text style={[styles.barraValor, valor === 0 && styles.barraValorVazio]}>{valor}/5</Text>
+      </View>
       <View style={styles.barraSegmentos}>
         {[1, 2, 3, 4, 5].map((n) => (
           <View key={n} style={[styles.segmento, n <= valor && styles.segmentoAtivo]} />
@@ -48,11 +53,12 @@ export default function JogadoresScreen() {
   const [filtroPosicao, setFiltroPosicao] = useState('todas');
 
   const stats = useMemo(() => {
-    const contagem = { levantadores: 0, atacantes: 0, defensores: 0, curingas: 0 };
+    const contagem = { levantadores: 0, atacantes: 0, defensores: 0 };
     jogadores.forEach((j) => {
       const grupo = GRUPO_POSICAO[j.posicao];
+      // "Qualquer" não é levantador/atacante/defensor de verdade — conta só
+      // no total, não força numa categoria que não é dele.
       if (grupo) contagem[grupo] += 1;
-      else contagem.curingas += 1; // posição "Qualquer" (ou não mapeada)
     });
     return { total: jogadores.length, ...contagem };
   }, [jogadores]);
@@ -114,10 +120,12 @@ export default function JogadoresScreen() {
 
   return (
     <Screen edges={['bottom']}>
+      <AuthBackground />
       <ScrollView contentContainerStyle={styles.scroll}>
+      <View style={styles.container}>
         <View style={styles.headerRow}>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.title}>🏐 Jogadores</Text>
+            <Text style={styles.title}>Jogadores</Text>
             <Text style={styles.subtitle}>Gerencie os participantes da sua pelada.</Text>
           </View>
           <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('NovoJogador')}>
@@ -148,13 +156,6 @@ export default function JogadoresScreen() {
               <Text style={styles.statNumero}>{stats.defensores}</Text>
               <Text style={styles.statLabel}>defensores</Text>
             </View>
-            {stats.curingas > 0 && (
-              <View style={styles.statCard}>
-                <Feather name="shuffle" size={18} color={colors.inkSoft} />
-                <Text style={styles.statNumero}>{stats.curingas}</Text>
-                <Text style={styles.statLabel}>curingas</Text>
-              </View>
-            )}
           </View>
         )}
 
@@ -202,29 +203,29 @@ export default function JogadoresScreen() {
             <ActivityIndicator color={colors.ocean} />
           </View>
         ) : jogadores.length === 0 ? (
-          <View style={styles.center}>
-            <Feather name="users" size={32} color={colors.inkSoft} style={{ marginBottom: 10 }} />
-            <Text style={styles.emptyText}>Nenhum jogador cadastrado ainda.</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.navigate('NovoJogador')}
-            >
-              <Feather name="plus" size={16} color={colors.white} />
-              <Text style={styles.addButtonText}>Adicionar jogador</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.seedButton} onPress={handleSemearTeste} disabled={semeando}>
-              {semeando ? (
-                <ActivityIndicator color={colors.navy} />
-              ) : (
-                <Text style={styles.seedButtonText}>ou adicionar 12 jogadores de teste</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          <EmptyState
+            icon="users"
+            title="Nenhum jogador cadastrado"
+            description="Cadastre os jogadores da sua pelada pra poder sortear times equilibrados."
+            buttonLabel="Adicionar jogador"
+            onPress={() => navigation.navigate('NovoJogador')}
+          >
+            {__DEV__ && (
+              <TouchableOpacity style={styles.seedButton} onPress={handleSemearTeste} disabled={semeando}>
+                {semeando ? (
+                  <ActivityIndicator color={colors.navy} />
+                ) : (
+                  <Text style={styles.seedButtonText}>ou adicionar 12 jogadores de teste</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </EmptyState>
         ) : (
           <>
             <View style={styles.grid}>
               {jogadoresFiltrados.map((item, index) => {
                 const categoria = categoriaJogador(item.nivelMedio ?? 3);
+                const semNotas = HABILIDADES.every((h) => !item[h.value]);
                 return (
                   <View key={item.id} style={styles.card}>
                     <View style={styles.cardTopo}>
@@ -268,6 +269,13 @@ export default function JogadoresScreen() {
                     </View>
                     <Text style={styles.posicao}>{POSICAO_LABEL[item.posicao] || item.posicao}</Text>
 
+                    {semNotas && (
+                      <View style={styles.semNotasAviso}>
+                        <Feather name="alert-triangle" size={11} color={colors.coral} />
+                        <Text style={styles.semNotasTexto}>Habilidades não preenchidas</Text>
+                      </View>
+                    )}
+
                     <View style={styles.barrasGrid}>
                       {HABILIDADES.map((h) => (
                         <BarraNota key={h.value} label={h.label} valor={item[h.value] ?? item.nivelMedio ?? 0} />
@@ -278,19 +286,23 @@ export default function JogadoresScreen() {
               })}
             </View>
 
-            <TouchableOpacity style={styles.resetLink} onPress={handleRecriarTeste} disabled={semeando}>
-              <Feather name="refresh-cw" size={13} color={colors.inkSoft} />
-              <Text style={styles.resetLinkText}>Recriar jogadores de teste</Text>
-            </TouchableOpacity>
+            {__DEV__ && (
+              <TouchableOpacity style={styles.resetLink} onPress={handleRecriarTeste} disabled={semeando}>
+                <Feather name="refresh-cw" size={13} color={colors.inkSoft} />
+                <Text style={styles.resetLinkText}>Recriar jogadores de teste</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
+      </View>
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: { padding: 16, paddingBottom: 90 },
+  container: { width: '100%', maxWidth: 1180, alignSelf: 'center' },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -327,6 +339,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    width: '100%',
+    maxWidth: 420,
     backgroundColor: colors.white,
     borderRadius: 12,
     borderWidth: 1,
@@ -349,7 +363,6 @@ const styles = StyleSheet.create({
   filtroChipText: { color: colors.ocean, fontWeight: '600', fontSize: 12 },
   filtroChipTextAtivo: { color: colors.white },
   center: { alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyText: { color: colors.inkSoft, textAlign: 'center', fontSize: 16, marginBottom: 16 },
   seedButton: {
     marginTop: 14,
     paddingVertical: 4,
@@ -358,8 +371,8 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   card: {
     flexGrow: 1,
-    flexBasis: 260,
-    maxWidth: 340,
+    flexBasis: 280,
+    maxWidth: 310,
     backgroundColor: colors.white,
     borderRadius: 16,
     padding: 16,
@@ -394,11 +407,16 @@ const styles = StyleSheet.create({
   retrospectoText: { fontSize: 11, fontWeight: '700', color: colors.inkSoft },
   categoriaText: { fontSize: 11, fontWeight: '700' },
   posicao: { fontSize: 12, color: colors.inkSoft, marginTop: 6, marginBottom: 10 },
-  barrasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  barraLinha: { width: '46%', marginBottom: 6 },
-  barraLabel: { fontSize: 11, color: colors.inkSoft, marginBottom: 3 },
+  semNotasAviso: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 8 },
+  semNotasTexto: { fontSize: 11, color: colors.coral, fontWeight: '600' },
+  barrasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  barraLinha: { width: '46%', marginBottom: 5 },
+  barraLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
+  barraLabel: { fontSize: 11, color: colors.inkSoft },
+  barraValor: { fontSize: 11, color: colors.ink, fontWeight: '700' },
+  barraValorVazio: { color: colors.coral },
   barraSegmentos: { flexDirection: 'row', gap: 3 },
-  segmento: { flex: 1, height: 5, borderRadius: 3, backgroundColor: colors.border },
+  segmento: { flex: 1, height: 7, borderRadius: 4, backgroundColor: colors.border },
   segmentoAtivo: { backgroundColor: colors.ocean },
   resetLink: {
     flexDirection: 'row',

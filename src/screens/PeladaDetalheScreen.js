@@ -9,7 +9,7 @@ import Screen from '../components/Screen';
 import { mostrarAlerta } from '../utils/alerta';
 import { compartilharTimes } from '../utils/compartilhar';
 
-const MODO_LABEL = { balanceado: '⚖️ Balanceado', aleatorio: '🎲 Aleatório' };
+const MODO_LABEL = { balanceado: 'Balanceado', aleatorio: 'Aleatório' };
 
 function formatarData(timestamp) {
   if (!timestamp) return '';

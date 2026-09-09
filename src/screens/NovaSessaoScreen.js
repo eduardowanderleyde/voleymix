@@ -51,7 +51,7 @@ export default function NovaSessaoScreen() {
 
   return (
     <FormScreen>
-      <Text style={styles.titulo}>📅 Nova sessão</Text>
+      <Text style={styles.titulo}>Nova sessão</Text>
       <Text style={styles.hint}>
         Uma sessão é a pelada de sempre — cadastre uma vez e reaproveite a lista de presença toda semana.
       </Text>

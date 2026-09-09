@@ -4,9 +4,11 @@ import { useNavigation } from '@react-navigation/native';
 import Feather from '@expo/vector-icons/Feather';
 import { colors, cardShadow } from '../theme';
 import Screen from '../components/Screen';
+import AuthBackground from '../components/AuthBackground';
+import EmptyState from '../components/EmptyState';
 import { useMinhaColecao } from '../hooks/useMinhaColecao';
 
-const MODO_LABEL = { balanceado: '⚖️ Balanceado', aleatorio: '🎲 Aleatório' };
+const MODO_LABEL = { balanceado: 'Balanceado', aleatorio: 'Aleatório' };
 
 function formatarData(timestamp) {
   if (!timestamp) return '';
@@ -55,8 +57,10 @@ export default function HistoricoScreen() {
 
   return (
     <Screen edges={['bottom']}>
+      <AuthBackground />
+      <View style={styles.container}>
       <View style={styles.headerWrap}>
-        <Text style={styles.header}>📋 Histórico de peladas</Text>
+        <Text style={styles.header}>Histórico de peladas</Text>
         <Text style={styles.subtitle}>Reveja os times sorteados em cada pelada.</Text>
       </View>
 
@@ -121,13 +125,14 @@ export default function HistoricoScreen() {
           <ActivityIndicator color={colors.ocean} />
         </View>
       ) : peladas.length === 0 ? (
-        <View style={styles.center}>
-          <Feather name="clipboard" size={32} color={colors.inkSoft} style={{ marginBottom: 10 }} />
-          <Text style={styles.emptyText}>Nenhuma pelada salva ainda.</Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.navigate('Sorteio')}>
-            <Text style={styles.emptyButtonText}>Sortear times agora</Text>
-          </TouchableOpacity>
-        </View>
+        <EmptyState
+          icon="clipboard"
+          title="Nenhuma pelada salva"
+          description="Sorteie os times de uma pelada e ela aparece aqui, com histórico e estatísticas do grupo."
+          buttonLabel="Sortear times agora"
+          buttonIcon="shuffle"
+          onPress={() => navigation.navigate('Sorteio')}
+        />
       ) : (
         <FlatList
           contentContainerStyle={styles.lista}
@@ -150,11 +155,13 @@ export default function HistoricoScreen() {
           )}
         />
       )}
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, width: '100%', maxWidth: 1180, alignSelf: 'center' },
   headerWrap: { padding: 16, paddingBottom: 8 },
   statsCard: {
     backgroundColor: colors.white,
@@ -178,16 +185,7 @@ const styles = StyleSheet.create({
   header: { fontSize: 20, fontWeight: '700', color: colors.navy },
   subtitle: { fontSize: 13, color: colors.inkSoft, marginTop: 2 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyText: { color: colors.inkSoft, textAlign: 'center', fontSize: 16, marginBottom: 16 },
-  emptyButton: {
-    borderWidth: 1,
-    borderColor: colors.ocean,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  emptyButtonText: { color: colors.ocean, fontWeight: '700' },
-  lista: { paddingHorizontal: 16, paddingBottom: 24, gap: 12 },
+  lista: { paddingHorizontal: 16, paddingBottom: 90, gap: 12 },
   card: {
     backgroundColor: colors.white,
     borderRadius: 16,
