@@ -15,7 +15,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { auth, db } from '../config/firebase';
 import { colors, POSICOES, POSICAO_LABEL_PLURAL, cardShadow } from '../theme';
 import Screen from '../components/Screen';
-import { sortearTimes, posicoesFaltando, faltasGlobais, FORMACAO_IDEAL } from '../utils/sorteio';
+import { gerarSugestoes, posicoesFaltando, faltasGlobais, FORMACAO_IDEAL } from '../utils/sorteio';
 import { mostrarAlerta } from '../utils/alerta';
 import { iniciais } from '../utils/iniciais';
 import { useMinhaColecao } from '../hooks/useMinhaColecao';
@@ -33,8 +33,10 @@ export default function SorteioScreen() {
   const [presentes, setPresentes] = useState({});
   const [numTimes, setNumTimes] = useState(2);
   const [modo, setModo] = useState('balanceado');
-  const [times, setTimes] = useState(null);
+  const [sugestoes, setSugestoes] = useState(null);
+  const [indiceSelecionado, setIndiceSelecionado] = useState(0);
   const [salvando, setSalvando] = useState(false);
+  const times = sugestoes?.[indiceSelecionado]?.times ?? null;
 
   useEffect(() => {
     setPresentes((atual) => {
@@ -64,12 +66,12 @@ export default function SorteioScreen() {
       novo[j.id] = valor;
     });
     setPresentes(novo);
-    setTimes(null);
+    setSugestoes(null);
   }
 
   function alternarPresenca(id) {
     setPresentes((atual) => ({ ...atual, [id]: !atual[id] }));
-    setTimes(null);
+    setSugestoes(null);
   }
 
   function handleSortear() {
@@ -77,7 +79,8 @@ export default function SorteioScreen() {
       mostrarAlerta('Jogadores insuficientes', `Marque presença de pelo menos ${numTimes} jogadores.`);
       return;
     }
-    setTimes(sortearTimes(listaPresentes, numTimes, modo));
+    setSugestoes(gerarSugestoes(listaPresentes, numTimes, modo, 3));
+    setIndiceSelecionado(0);
   }
 
   async function handleSalvar() {
@@ -88,9 +91,10 @@ export default function SorteioScreen() {
         ownerId: auth.currentUser.uid,
         modo,
         numTimes,
-        times: times.map((time) =>
-          time.map((j) => ({ id: j.id, nome: j.nome, nivelMedio: j.nivelMedio, posicao: j.posicao }))
-        ),
+        // Firestore não aceita array dentro de array: cada time vira um objeto com um campo "jogadores"
+        times: times.map((time) => ({
+          jogadores: time.map((j) => ({ id: j.id, nome: j.nome, nivelMedio: j.nivelMedio, posicao: j.posicao })),
+        })),
         createdAt: serverTimestamp(),
       });
       mostrarAlerta('Pelada salva no histórico!');
@@ -228,7 +232,7 @@ export default function SorteioScreen() {
                           style={[styles.numeroChip, numTimes === n && styles.numeroChipAtivo]}
                           onPress={() => {
                             setNumTimes(n);
-                            setTimes(null);
+                            setSugestoes(null);
                           }}
                         >
                           <Text style={[styles.numeroChipText, numTimes === n && styles.numeroChipTextAtivo]}>
@@ -295,9 +299,44 @@ export default function SorteioScreen() {
                 </View>
               </View>
 
-              {times && (
+              {sugestoes && sugestoes.length > 0 && (
                 <View style={styles.resultado}>
-                  <Text style={styles.sectionLabel}>Resultado</Text>
+                  <View style={styles.resultadoHeader}>
+                    <Text style={styles.sectionLabel}>Resultado</Text>
+                    <TouchableOpacity style={styles.linkRegerar} onPress={handleSortear}>
+                      <Feather name="refresh-cw" size={13} color={colors.ocean} />
+                      <Text style={styles.linkAcao}>Gerar novas opções</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {sugestoes.length > 1 && (
+                    <View style={styles.opcoesRow}>
+                      {sugestoes.map((sugestao, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          style={[styles.opcaoChip, indiceSelecionado === i && styles.opcaoChipAtiva]}
+                          onPress={() => setIndiceSelecionado(i)}
+                        >
+                          <Text
+                            style={[styles.opcaoChipText, indiceSelecionado === i && styles.opcaoChipTextAtiva]}
+                          >
+                            Opção {i + 1}
+                          </Text>
+                          {modo === 'balanceado' && (
+                            <Text
+                              style={[
+                                styles.opcaoChipDiferenca,
+                                indiceSelecionado === i && styles.opcaoChipTextAtiva,
+                              ]}
+                            >
+                              diferença {sugestao.diferenca}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
                   <View style={styles.resultadoGrid}>
                     {times.map((time, i) => {
                       const faltas = posicoesFaltando(time);
@@ -469,6 +508,21 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.white, fontWeight: '700', fontSize: 16 },
 
   resultado: { marginTop: 24 },
+  resultadoHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  linkRegerar: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  opcoesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  opcaoChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  opcaoChipAtiva: { borderColor: colors.ocean, backgroundColor: colors.oceanTint },
+  opcaoChipText: { fontSize: 13, fontWeight: '700', color: colors.inkSoft },
+  opcaoChipTextAtiva: { color: colors.ocean },
+  opcaoChipDiferenca: { fontSize: 10, color: colors.inkSoft, marginTop: 2 },
   resultadoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 16 },
   timeCard: {
     flexGrow: 1,

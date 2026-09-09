@@ -48,6 +48,49 @@ export function sortearTimes(jogadores, numTimes, modo) {
   return sortearAleatorio(jogadores, numTimes);
 }
 
+function somaNivel(time) {
+  return time.reduce((soma, j) => soma + (j.nivelMedio ?? 0), 0);
+}
+
+export function diferencaNivel(times) {
+  const somas = times.map(somaNivel);
+  return Math.max(...somas) - Math.min(...somas);
+}
+
+function assinatura(times) {
+  return times
+    .map((time) => time.map((j) => j.id).sort().join(','))
+    .sort()
+    .join('|');
+}
+
+// Gera até `quantidade` sorteios diferentes entre si (mesmos jogadores, times
+// diferentes), pra deixar o organizador escolher em vez de receber só uma
+// opção. Pro modo balanceado, embaralha a entrada antes de cada tentativa —
+// como o algoritmo é guloso por nível, isso varia o desempate entre
+// jogadores de mesmo nível sem perder o equilíbrio. Ordena do mais
+// equilibrado pro menos.
+export function gerarSugestoes(jogadores, numTimes, modo, quantidade = 3) {
+  const vistos = new Set();
+  const sugestoes = [];
+  const maxTentativas = quantidade * 8;
+
+  for (let tentativa = 0; tentativa < maxTentativas && sugestoes.length < quantidade; tentativa++) {
+    const entrada = modo === 'balanceado' ? embaralhar(jogadores) : jogadores;
+    const times = sortearTimes(entrada, numTimes, modo);
+    const chave = assinatura(times);
+    if (vistos.has(chave)) continue;
+    vistos.add(chave);
+    sugestoes.push({ times, diferenca: diferencaNivel(times) });
+  }
+
+  if (modo === 'balanceado') {
+    sugestoes.sort((a, b) => a.diferenca - b.diferenca);
+  }
+
+  return sugestoes;
+}
+
 export const FORMACAO_IDEAL = { levantador: 1, oposto: 1, ponteiro: 2, central: 2 };
 
 function contarPosicoes(jogadores) {

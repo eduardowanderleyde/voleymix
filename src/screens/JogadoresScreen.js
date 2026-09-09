@@ -235,8 +235,26 @@ export default function JogadoresScreen() {
                     </View>
 
                     <Text style={styles.nome}>{item.nome}</Text>
-                    <View style={[styles.categoriaBadge, { backgroundColor: categoria.bg }]}>
-                      <Text style={[styles.categoriaText, { color: categoria.text }]}>{categoria.label}</Text>
+                    <View style={styles.badgesRow}>
+                      <View style={[styles.categoriaBadge, { backgroundColor: categoria.bg }]}>
+                        <Text style={[styles.categoriaText, { color: categoria.text }]}>{categoria.label}</Text>
+                      </View>
+                      {item.qtdAvaliacoes > 0 && (
+                        <View style={styles.reputacaoBadge}>
+                          <Feather name="star" size={10} color="#8A6200" />
+                          <Text style={styles.reputacaoText}>
+                            {(item.somaAvaliacoes / item.qtdAvaliacoes).toFixed(1)} ({item.qtdAvaliacoes})
+                          </Text>
+                        </View>
+                      )}
+                      {(item.vitorias > 0 || item.derrotas > 0) && (
+                        <View style={styles.retrospectoBadge}>
+                          <Feather name="award" size={10} color={colors.inkSoft} />
+                          <Text style={styles.retrospectoText}>
+                            {item.vitorias || 0}V · {item.derrotas || 0}D
+                          </Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={styles.posicao}>{POSICAO_LABEL[item.posicao] || item.posicao}</Text>
 
@@ -342,7 +360,28 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.white, fontWeight: '700', fontSize: 14 },
   cardAcoes: { flexDirection: 'row', gap: 12 },
   nome: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 10 },
-  categoriaBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10, marginTop: 4 },
+  badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' },
+  categoriaBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },
+  reputacaoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FFF1CC',
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  reputacaoText: { fontSize: 11, fontWeight: '700', color: '#8A6200' },
+  retrospectoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.border,
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  retrospectoText: { fontSize: 11, fontWeight: '700', color: colors.inkSoft },
   categoriaText: { fontSize: 11, fontWeight: '700' },
   posicao: { fontSize: 12, color: colors.inkSoft, marginTop: 6, marginBottom: 10 },
   barrasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

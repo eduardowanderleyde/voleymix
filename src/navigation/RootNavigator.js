@@ -8,6 +8,7 @@ import AuthStack from './AuthStack';
 import AppTabs from './AppTabs';
 import NovoJogadorScreen from '../screens/NovoJogadorScreen';
 import PeladaDetalheScreen from '../screens/PeladaDetalheScreen';
+import AvaliarPeladaScreen from '../screens/AvaliarPeladaScreen';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -47,6 +48,11 @@ export default function RootNavigator() {
               name="PeladaDetalhe"
               component={PeladaDetalheScreen}
               options={{ headerShown: true, title: 'Detalhe da pelada' }}
+            />
+            <Stack.Screen
+              name="AvaliarPelada"
+              component={AvaliarPeladaScreen}
+              options={{ headerShown: true, title: 'Avaliar jogadores' }}
             />
           </>
         ) : (
