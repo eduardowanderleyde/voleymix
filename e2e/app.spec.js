@@ -20,7 +20,7 @@ async function preencherPorLabel(page, label, valor) {
   const rotulos = await page.locator('text=' + JSON.stringify(label)).all();
   for (const rotulo of rotulos) {
     if (await rotulo.isVisible()) {
-      await rotulo.locator('xpath=following-sibling::*[1]//input').fill(valor);
+      await rotulo.locator('xpath=following-sibling::*[1]/descendant-or-self::input').fill(valor);
       return;
     }
   }
@@ -44,7 +44,7 @@ test.describe('VoleiTeam', () => {
       await preencherPorLabel(page, 'Senha', senha);
       await preencherPorLabel(page, 'Confirmar senha', senha);
       await clicar(page, 'Criar conta');
-      await expect(page.getByText('🔀 Sortear times', { exact: true })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText('📅 Sessões', { exact: true })).toBeVisible({ timeout: 20_000 });
     });
 
     await test.step('semear jogadores de teste', async () => {
@@ -87,7 +87,7 @@ test.describe('VoleiTeam', () => {
 
     await test.step('selo de reputação e retrospecto aparecem nos jogadores', async () => {
       await page.goto('/');
-      await expect(page.getByText('🔀 Sortear times', { exact: true })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText('📅 Sessões', { exact: true })).toBeVisible({ timeout: 20_000 });
       await clicar(page, 'Jogadores');
       await expect(page.getByText(/\d\.\d \(\d+\)/).first()).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText(/\dV · \dD/).first()).toBeVisible();
@@ -97,6 +97,32 @@ test.describe('VoleiTeam', () => {
       await clicar(page, 'Histórico');
       await expect(page.getByText('Mais presentes', { exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByText('Mais vitórias', { exact: true })).toBeVisible();
+    });
+
+    await test.step('sessão recorrente: criar, confirmar presença e sortear a partir dela', async () => {
+      await clicar(page, 'Sessões');
+      await expect(page.getByText('Criar sessão', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await clicar(page, 'Nova sessão');
+      await expect(page.getByText('📅 Nova sessão', { exact: true })).toBeVisible();
+      await preencherPorLabel(page, 'Nome', 'Pelada de terça');
+      await clicar(page, 'Ter');
+      await preencherPorLabel(page, 'Horário (opcional)', '19h');
+      await clicar(page, 'Criar sessão');
+      await expect(page.getByText('Pelada de terça', { exact: true }).last()).toBeVisible({ timeout: 15_000 });
+
+      await clicar(page, 'Pelada de terça');
+      await expect(page.getByText('Quem confirmou?', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await clicar(page, 'Karina');
+      await clicar(page, 'Ana');
+      await clicar(page, 'Salvar presença');
+
+      await clicar(page, '🔀 Sortear times');
+      await expect(page.getByText('🔀 Pelada de terça', { exact: true })).toBeVisible({ timeout: 15_000 });
+      await clicar(page, 'Sortear times');
+      await expect(page.getByText('Resultado', { exact: true }).last()).toBeVisible();
+      await clicar(page, '💾 Salvar no histórico');
+      await expect(page.getByText('📋 Histórico de peladas', { exact: true }).last()).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText('Pelada de terça', { exact: true }).last()).toBeVisible();
     });
   });
 });

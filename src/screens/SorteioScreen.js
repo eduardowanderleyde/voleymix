@@ -9,14 +9,15 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useNavigation } from '@react-navigation/native';
+import { collection, addDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import Feather from '@expo/vector-icons/Feather';
 import { auth, db } from '../config/firebase';
 import { colors, POSICOES, POSICAO_LABEL_PLURAL, cardShadow } from '../theme';
 import Screen from '../components/Screen';
 import { gerarSugestoes, posicoesFaltando, faltasGlobais, FORMACAO_IDEAL } from '../utils/sorteio';
 import { mostrarAlerta } from '../utils/alerta';
+import { compartilharTimes } from '../utils/compartilhar';
 import { iniciais } from '../utils/iniciais';
 import { useMinhaColecao } from '../hooks/useMinhaColecao';
 
@@ -26,11 +27,13 @@ const MAX_TIMES = 6;
 
 export default function SorteioScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const sessao = route.params?.sessao;
   const { width } = useWindowDimensions();
   const largo = width >= 900;
 
   const { dados: jogadores, carregando } = useMinhaColecao('jogadores', (a, b) => a.nome.localeCompare(b.nome));
-  const [presentes, setPresentes] = useState({});
+  const [presentes, setPresentes] = useState(() => sessao?.presentes ?? {});
   const [numTimes, setNumTimes] = useState(2);
   const [modo, setModo] = useState('balanceado');
   const [sugestoes, setSugestoes] = useState(null);
@@ -39,6 +42,10 @@ export default function SorteioScreen() {
   const times = sugestoes?.[indiceSelecionado]?.times ?? null;
 
   useEffect(() => {
+    // Sem sessão: sorteio avulso, todo mundo começa marcado (o de sempre).
+    // Vindo de uma sessão: só quem foi confirmado lá aparece marcado — quem
+    // não mexeu no toggle não deve virar "presente" de graça.
+    if (sessao) return;
     setPresentes((atual) => {
       const novo = { ...atual };
       jogadores.forEach((j) => {
@@ -83,6 +90,14 @@ export default function SorteioScreen() {
     setIndiceSelecionado(0);
   }
 
+  function handleCompartilhar() {
+    if (!times) return;
+    compartilharTimes(
+      times.map((time) => ({ jogadores: time })),
+      { modo }
+    );
+  }
+
   async function handleSalvar() {
     if (!times) return;
     setSalvando(true);
@@ -95,8 +110,14 @@ export default function SorteioScreen() {
         times: times.map((time) => ({
           jogadores: time.map((j) => ({ id: j.id, nome: j.nome, nivelMedio: j.nivelMedio, posicao: j.posicao })),
         })),
+        ...(sessao ? { sessaoId: sessao.id, sessaoTitulo: sessao.titulo } : {}),
         createdAt: serverTimestamp(),
       });
+      // Guarda quem confirmou presença nesta sessão, pra já vir marcado da
+      // próxima vez (o pessoal costuma se repetir semana a semana).
+      if (sessao) {
+        await updateDoc(doc(db, 'sessoes', sessao.id), { presentes });
+      }
       mostrarAlerta('Pelada salva no histórico!');
       navigation.navigate('Historico');
     } catch (e) {
@@ -112,7 +133,7 @@ export default function SorteioScreen() {
     <Screen edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.container}>
-          <Text style={styles.title}>🔀 Sortear times</Text>
+          <Text style={styles.title}>🔀 {sessao ? sessao.titulo : 'Sortear times'}</Text>
 
           {carregando ? (
             <View style={styles.center}>
@@ -360,17 +381,24 @@ export default function SorteioScreen() {
                     })}
                   </View>
 
-                  <TouchableOpacity
-                    style={[styles.button, styles.buttonSecundario]}
-                    onPress={handleSalvar}
-                    disabled={salvando}
-                  >
-                    {salvando ? (
-                      <ActivityIndicator color={colors.white} />
-                    ) : (
-                      <Text style={styles.buttonText}>💾 Salvar no histórico</Text>
-                    )}
-                  </TouchableOpacity>
+                  <View style={styles.acoesResultadoRow}>
+                    <TouchableOpacity style={styles.buttonCompartilhar} onPress={handleCompartilhar}>
+                      <Feather name="share-2" size={16} color={colors.ocean} />
+                      <Text style={styles.buttonCompartilharText}>Compartilhar</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.button, styles.buttonSecundario, styles.buttonSalvar]}
+                      onPress={handleSalvar}
+                      disabled={salvando}
+                    >
+                      {salvando ? (
+                        <ActivityIndicator color={colors.white} />
+                      ) : (
+                        <Text style={styles.buttonText}>💾 Salvar no histórico</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </>
@@ -505,6 +533,19 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   buttonSecundario: { backgroundColor: colors.navy, marginTop: 0 },
+  acoesResultadoRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  buttonSalvar: { flex: 1, marginTop: 0 },
+  buttonCompartilhar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.ocean,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  buttonCompartilharText: { color: colors.ocean, fontWeight: '700', fontSize: 14 },
   buttonText: { color: colors.white, fontWeight: '700', fontSize: 16 },
 
   resultado: { marginTop: 24 },

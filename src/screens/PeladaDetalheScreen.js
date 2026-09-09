@@ -7,6 +7,7 @@ import { db } from '../config/firebase';
 import { colors, cardShadow } from '../theme';
 import Screen from '../components/Screen';
 import { mostrarAlerta } from '../utils/alerta';
+import { compartilharTimes } from '../utils/compartilhar';
 
 const MODO_LABEL = { balanceado: '⚖️ Balanceado', aleatorio: '🎲 Aleatório' };
 
@@ -60,8 +61,19 @@ export default function PeladaDetalheScreen() {
   return (
     <Screen edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.data}>{formatarData(pelada.createdAt)}</Text>
-        <Text style={styles.meta}>{MODO_LABEL[pelada.modo] || pelada.modo}</Text>
+        <View style={styles.cabecalhoRow}>
+          <View>
+            {!!pelada.sessaoTitulo && <Text style={styles.sessaoTag}>{pelada.sessaoTitulo}</Text>}
+            <Text style={styles.data}>{formatarData(pelada.createdAt)}</Text>
+            <Text style={styles.meta}>{MODO_LABEL[pelada.modo] || pelada.modo}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.compartilharButton}
+            onPress={() => compartilharTimes(pelada.times, { modo: pelada.modo, data: formatarData(pelada.createdAt) })}
+          >
+            <Feather name="share-2" size={16} color={colors.ocean} />
+          </TouchableOpacity>
+        </View>
 
         {pelada.avaliadaEm ? (
           <View style={styles.avaliadaBox}>
@@ -125,6 +137,17 @@ export default function PeladaDetalheScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
+  cabecalhoRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  compartilharButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.ocean,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sessaoTag: { fontSize: 12, color: colors.ocean, fontWeight: '700' },
   data: { fontSize: 18, fontWeight: '700', color: colors.navy },
   meta: { fontSize: 14, color: colors.inkSoft, marginBottom: 16 },
   avaliarButton: {

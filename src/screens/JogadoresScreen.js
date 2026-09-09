@@ -48,10 +48,11 @@ export default function JogadoresScreen() {
   const [filtroPosicao, setFiltroPosicao] = useState('todas');
 
   const stats = useMemo(() => {
-    const contagem = { levantadores: 0, atacantes: 0, defensores: 0 };
+    const contagem = { levantadores: 0, atacantes: 0, defensores: 0, curingas: 0 };
     jogadores.forEach((j) => {
       const grupo = GRUPO_POSICAO[j.posicao];
       if (grupo) contagem[grupo] += 1;
+      else contagem.curingas += 1; // posição "Qualquer" (ou não mapeada)
     });
     return { total: jogadores.length, ...contagem };
   }, [jogadores]);
@@ -125,28 +126,37 @@ export default function JogadoresScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Feather name="users" size={18} color={colors.navy} />
-            <Text style={styles.statNumero}>{stats.total}</Text>
-            <Text style={styles.statLabel}>jogadores</Text>
+        {jogadores.length > 0 && (
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Feather name="users" size={18} color={colors.navy} />
+              <Text style={styles.statNumero}>{stats.total}</Text>
+              <Text style={styles.statLabel}>jogadores</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Feather name="compass" size={18} color={colors.ocean} />
+              <Text style={styles.statNumero}>{stats.levantadores}</Text>
+              <Text style={styles.statLabel}>levantadores</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Feather name="zap" size={18} color={colors.sun} />
+              <Text style={styles.statNumero}>{stats.atacantes}</Text>
+              <Text style={styles.statLabel}>atacantes</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Feather name="shield" size={18} color={colors.coral} />
+              <Text style={styles.statNumero}>{stats.defensores}</Text>
+              <Text style={styles.statLabel}>defensores</Text>
+            </View>
+            {stats.curingas > 0 && (
+              <View style={styles.statCard}>
+                <Feather name="shuffle" size={18} color={colors.inkSoft} />
+                <Text style={styles.statNumero}>{stats.curingas}</Text>
+                <Text style={styles.statLabel}>curingas</Text>
+              </View>
+            )}
           </View>
-          <View style={styles.statCard}>
-            <Feather name="compass" size={18} color={colors.ocean} />
-            <Text style={styles.statNumero}>{stats.levantadores}</Text>
-            <Text style={styles.statLabel}>levantadores</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Feather name="zap" size={18} color={colors.sun} />
-            <Text style={styles.statNumero}>{stats.atacantes}</Text>
-            <Text style={styles.statLabel}>atacantes</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Feather name="shield" size={18} color={colors.coral} />
-            <Text style={styles.statNumero}>{stats.defensores}</Text>
-            <Text style={styles.statLabel}>defensores</Text>
-          </View>
-        </View>
+        )}
 
         {jogadores.length > 0 && (
           <>

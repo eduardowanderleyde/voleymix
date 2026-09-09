@@ -23,6 +23,16 @@ export const cardShadow = {
 
 export const NIVEIS = [1, 2, 3, 4, 5];
 
+export const DIAS_SEMANA = [
+  { value: 0, label: 'Dom' },
+  { value: 1, label: 'Seg' },
+  { value: 2, label: 'Ter' },
+  { value: 3, label: 'Qua' },
+  { value: 4, label: 'Qui' },
+  { value: 5, label: 'Sex' },
+  { value: 6, label: 'Sáb' },
+];
+
 export const POSICOES = [
   { value: 'levantador', label: 'Levantador' },
   { value: 'ponteiro', label: 'Ponteiro' },

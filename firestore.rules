@@ -23,5 +23,13 @@ service cloud.firestore {
       allow update, delete: if request.auth != null
                              && resource.data.ownerId == request.auth.uid;
     }
+
+    match /sessoes/{sessaoId} {
+      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth != null
+                             && resource.data.ownerId == request.auth.uid;
+    }
   }
 }

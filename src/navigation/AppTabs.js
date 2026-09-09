@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
+import SessoesScreen from '../screens/SessoesScreen';
 import SorteioScreen from '../screens/SorteioScreen';
 import JogadoresScreen from '../screens/JogadoresScreen';
 import HistoricoScreen from '../screens/HistoricoScreen';
@@ -10,6 +11,7 @@ import { colors } from '../theme';
 const Tab = createBottomTabNavigator();
 
 const ICONS = {
+  Sessoes: '📅',
   Sorteio: '🔀',
   Jogadores: '🏐',
   Historico: '📋',
@@ -17,6 +19,7 @@ const ICONS = {
 };
 
 const LABELS = {
+  Sessoes: 'Sessões',
   Sorteio: 'Sorteio',
   Jogadores: 'Jogadores',
   Historico: 'Histórico',
@@ -49,6 +52,7 @@ export default function AppTabs() {
         },
       })}
     >
+        <Tab.Screen name="Sessoes" component={SessoesScreen} />
         <Tab.Screen name="Sorteio" component={SorteioScreen} />
         <Tab.Screen name="Jogadores" component={JogadoresScreen} />
         <Tab.Screen name="Historico" component={HistoricoScreen} />

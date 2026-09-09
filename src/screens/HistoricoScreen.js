@@ -142,6 +142,7 @@ export default function HistoricoScreen() {
                 <Text style={styles.data}>{formatarData(item.createdAt)}</Text>
                 {item.vencedorIndex != null && <Feather name="award" size={14} color="#8A6200" />}
               </View>
+              {!!item.sessaoTitulo && <Text style={styles.sessaoTag}>{item.sessaoTitulo}</Text>}
               <Text style={styles.meta}>
                 {item.numTimes} times · {MODO_LABEL[item.modo] || item.modo}
               </Text>
@@ -195,6 +196,7 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   cardTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sessaoTag: { fontSize: 12, color: colors.ocean, fontWeight: '700', marginTop: 2 },
   data: { fontSize: 15, fontWeight: '700', color: colors.ink },
   meta: { fontSize: 13, color: colors.inkSoft, marginTop: 2 },
 });

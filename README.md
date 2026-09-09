@@ -54,18 +54,13 @@ e no Google Sign-In, então deixei como está.
 
 - **Web**: já funciona assim que o provedor Google estiver habilitado no passo
   acima — usa `signInWithPopup` ([`src/config/googleAuth.web.js`](src/config/googleAuth.web.js)).
-- **Android/iOS (pendente)**: o código já está pronto
-  ([`src/config/googleAuth.native.js`](src/config/googleAuth.native.js), pacote
-  `@react-native-google-signin/google-signin`, plugin já em `app.json`), mas
-  falta:
-  1. No Firebase Console → Configurações do projeto → Seus apps, registrar um
-     app **Android** (pacote `com.voleymix.app`) e um **iOS** (bundle id
-     `com.voleymix.app`), baixando `google-services.json` e
-     `GoogleService-Info.plist` e colocando na raiz do projeto.
-  2. Rodar `npx expo prebuild --clean` e depois `npx expo run:android` /
+- **Android/iOS**: os apps já estão registrados no Firebase (pacote/bundle id
+  `com.voleymix.app`) e `google-services.json`/`GoogleService-Info.plist` já
+  estão na raiz do projeto. Falta só:
+  1. Rodar `npx expo prebuild --clean` e depois `npx expo run:android` /
      `npx expo run:ios` — **não funciona no Expo Go**, precisa de build de
-     desenvolvimento.
-  3. `GOOGLE_WEB_CLIENT_ID` em [`src/config/firebase.js`](src/config/firebase.js)
+     desenvolvimento (Xcode/Android Studio instalados na máquina).
+  2. `GOOGLE_WEB_CLIENT_ID` em [`src/config/firebase.js`](src/config/firebase.js)
      já está preenchido com o client ID web do projeto.
 
 ## Dados (Firestore)
@@ -81,15 +76,22 @@ e no Google Sign-In, então deixei como está.
 - `peladas/{id}`: `ownerId`, `modo` (`aleatorio`/`balanceado`), `numTimes`,
   `times` (array de `{ jogadores: [...] }` — **não pode ser array dentro de
   array**, o Firestore rejeita), `createdAt`; opcionais: `vencedorIndex`
-  (índice do time em `times` que venceu) e `avaliadaEm` (timestamp de quando
-  os jogadores foram avaliados, trava reavaliação)
+  (índice do time em `times` que venceu), `avaliadaEm` (timestamp de quando
+  os jogadores foram avaliados, trava reavaliação), `sessaoId`/`sessaoTitulo`
+  (se a pelada nasceu de uma sessão agendada)
+- `sessoes/{id}`: `ownerId`, `titulo`, `recorrente` (bool), `diaSemana`
+  (0-6, só se recorrente) ou `data` (texto livre, só se não-recorrente),
+  `horario`, `local` (opcionais), `presentes` (map `jogadorId → bool`,
+  reaproveitado semana a semana), `ativa` (arquivar sem apagar)
 
-Cada organizador só enxerga os próprios jogadores e peladas (regras em
-`firestore.rules`).
+Cada organizador só enxerga os próprios jogadores, peladas e sessões (regras
+em `firestore.rules`).
 
 ## Próximos passos / ideias em aberto
 
-- [ ] Fazer o login com Google funcionar no celular (ver checklist acima)
-- [ ] Revisar telas de Histórico/Detalhe da pelada com o mesmo polimento
-      visual que Sorteio/Jogadores já receberam
-- [ ] Considerar dropdown de filtro de posição (hoje é uma fileira de chips)
+- [ ] Testar o login com Google de verdade num build de desenvolvimento
+      (apps já registrados no Firebase, falta só `expo prebuild` + rodar)
+- [ ] Ícone e splash personalizados (hoje é o padrão do Expo)
+- [ ] Confirmação de presença que o próprio jogador faz (hoje quem marca é
+      sempre o organizador) — exigiria conta por jogador ou link público,
+      avaliado e adiado por enquanto
