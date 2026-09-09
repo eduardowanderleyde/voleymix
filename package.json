@@ -24,7 +24,12 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "npm run test:e2e",
+    "test:e2e": "firebase emulators:exec --only auth,firestore \"npx playwright test\""
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
 }

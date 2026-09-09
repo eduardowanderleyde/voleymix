@@ -15,6 +15,25 @@ npm install
 npx expo start --web
 ```
 
+## Testes (e2e)
+
+```bash
+npm test
+```
+
+Roda o fluxo completo (cadastro → sortear times com múltiplas opções →
+salvar pelada → marcar vencedor → avaliar jogadores → conferir selos e
+rankings no Histórico) com Playwright, num navegador headless. Não toca no
+Firebase de produção: `npm test` sobe os emuladores de Auth/Firestore
+(`firebase emulators:exec`), aponta o app pra eles (`EXPO_PUBLIC_USE_EMULATOR=1`,
+ver [`src/config/firebase.js`](src/config/firebase.js)) e derruba tudo no
+final. Precisa do Chromium do Playwright instalado uma vez:
+`npx playwright install chromium`.
+
+Falha? Roda `npx playwright show-trace test-results/.../trace.zip` no
+teste que quebrou — o trace mostra passo a passo o que a página tinha na
+tela.
+
 ## Firebase
 
 Projeto: `voley-mix` (console em https://console.firebase.google.com/project/voley-mix).
@@ -51,9 +70,15 @@ Projeto: `voley-mix` (console em https://console.firebase.google.com/project/vol
 - `jogadores/{id}`: `ownerId`, `nome`, `posicao`, as 6 notas de habilidade
   (`saque`, `recepcao`, `levantamento`, `ataque`, `bloqueio`, `defesa`, cada
   uma 1-5) e `nivelMedio` (média das 6, calculada em
-  [`theme.js`](src/theme.js) `calcularNivelMedio`)
+  [`theme.js`](src/theme.js) `calcularNivelMedio`); opcionais, preenchidos
+  conforme o grupo usa o app: `somaAvaliacoes`/`qtdAvaliacoes` (nota média
+  recebida dos colegas, 1-5) e `vitorias`/`derrotas` (retrospecto — não entram
+  no cálculo de `nivelMedio`, são só um selo à parte)
 - `peladas/{id}`: `ownerId`, `modo` (`aleatorio`/`balanceado`), `numTimes`,
-  `times` (snapshot dos jogadores por time), `createdAt`
+  `times` (array de `{ jogadores: [...] }` — **não pode ser array dentro de
+  array**, o Firestore rejeita), `createdAt`; opcionais: `vencedorIndex`
+  (índice do time em `times` que venceu) e `avaliadaEm` (timestamp de quando
+  os jogadores foram avaliados, trava reavaliação)
 
 Cada organizador só enxerga os próprios jogadores e peladas (regras em
 `firestore.rules`).

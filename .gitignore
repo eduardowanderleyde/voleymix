@@ -38,6 +38,11 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
+# Playwright (testes e2e)
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
 # typescript
 *.tsbuildinfo
 
