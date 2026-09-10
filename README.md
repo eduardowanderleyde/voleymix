@@ -140,8 +140,78 @@ Ainda em aberto:
 - [ ] Testar o login com Google de verdade num build de desenvolvimento
       (apps já registrados no Firebase, falta só `expo prebuild` + rodar)
 - [ ] Ícone e splash personalizados (hoje é o padrão do Expo)
-- [ ] **Conta por jogador** (cada jogador confirma a própria presença, em
-      vez de só o organizador marcar por ele) — decidido fazer, mas é uma
-      mudança de arquitetura grande (autenticação + regras do Firestore
-      passam a ter dois papéis: organizador e jogador convidado). Precisa
-      definir o fluxo de convite antes de começar a construir.
+### Conta por jogador — plano em fases
+
+Decidido fazer: cada jogador confirma a própria presença, edita as próprias
+notas e avalia os colegas, em vez de só o organizador mexer em tudo. É uma
+mudança de arquitetura grande (dois papéis: organizador e jogador
+vinculado), por isso está dividida em fases pra não arriscar tudo de uma
+vez — cada fase deveria dar pra testar isoladamente antes de seguir pra
+próxima.
+
+- [x] **Fase 1 — convite, pedido e aprovação** (feita em `392915b`).
+      Código de convite em `users/{uid}.codigoConvite` (gerado automático,
+      mostrado no Perfil). Jogador cria conta, digita o código em "Entrar
+      numa pelada", isso cria um doc em `solicitacoes/{id}` com
+      `status: 'pendente'`. Organizador vê em "Pedidos pra entrar" no
+      Perfil e aprova/recusa. Aprovar cria `jogadores/{uid do jogador}`
+      (doc ID = uid da conta, não um ID aleatório — decisão de design que
+      as próximas fases dependem) com `ownerId` do organizador e notas
+      padrão 3. Regras do `solicitacoes` já publicadas em
+      `firestore.rules`.
+
+- [ ] **Fase 2 — jogador vinculado enxerga os dados do organizador**.
+      Hoje toda tela consulta `where('ownerId', '==', auth.currentUser.uid)`
+      (via `useMinhaColecao`) — pra um jogador vinculado isso retorna vazio,
+      porque ele não é dono de nada, é dono do *organizador*.
+      - Criar hook `useEffectiveOwnerId()`: se existir
+        `jogadores/{meu uid}`, uso o `ownerId` de dentro dele; senão, uso
+        meu próprio uid (sou organizador).
+      - `SorteioScreen`, `JogadoresScreen`, `HistoricoScreen`,
+        `SessoesScreen` (e os writes de `NovoJogadorScreen`/
+        `NovaSessaoScreen`) trocam `auth.currentUser.uid` por esse id
+        efetivo.
+      - Esconder da UI o que só organizador pode fazer quando o usuário é
+        jogador vinculado: "Adicionar jogador", "Nova sessão", editar/
+        excluir jogador, configurar e disparar o sorteio (não estava nas
+        permissões pedidas — jogador só vê o resultado, não configura).
+      - Regras do Firestore: liberar leitura de `peladas`/`sessoes`/
+        `jogadores` pro jogador vinculado do mesmo grupo (comparando
+        `resource.data.ownerId` com o `ownerId` do meu próprio doc
+        `jogadores/{auth.uid}`, via `get()` na regra).
+
+- [ ] **Fase 3 — ações que o próprio jogador faz**.
+      - Confirmar a própria presença: `sessoes.presentes` é um mapa
+        `jogadorId → bool` — como `jogadorId` agora pode ser o próprio
+        `auth.uid` do jogador vinculado, a regra de update pode checar
+        `request.resource.data.presentes.diff(resource.data.presentes)
+        .affectedKeys().hasOnly([request.auth.uid])` (só mexe na própria
+        entrada do mapa, não nas dos outros).
+      - Editar as próprias 6 notas de habilidade em
+        `jogadores/{auth.uid}` — regra de update restrita a esses campos
+        (`saque`/`recepcao`/`levantamento`/`ataque`/`bloqueio`/`defesa`/
+        `nivelMedio`), nunca `ownerId`, `vitorias`, `derrotas`,
+        `somaAvaliacoes`, `qtdAvaliacoes`.
+      - Avaliar os colegas: abrir `AvaliarPeladaScreen` pra jogador
+        vinculado (hoje só quem tem `ownerId` acessa) e permitir, via
+        regra, escrever `somaAvaliacoes`/`qtdAvaliacoes` em *outro*
+        `jogadores/{id}` contanto que os dois tenham o mesmo `ownerId`
+        (checagem com `get()`).
+      - Essa fase é a que mexe em mais regra fina — vale testar contra o
+        emulador (`npm test` já sobe Auth+Firestore local) antes de
+        publicar em produção.
+
+- [ ] **Fase 4 — polimento e casos de borda**.
+      - Indicador visual no app ("Você faz parte da pelada de [nome]" vs
+        "Você é organizador") — hoje não tem nada na tela dizendo qual dos
+        dois papéis a pessoa está usando.
+      - Jogador sair do grupo / organizador remover um jogador vinculado
+        (hoje só existe `allow delete` pro organizador em `jogadores`, dá
+        pra reaproveitar, mas falta o botão).
+      - Decidir o que fazer se a pessoa tentar entrar em *dois* grupos
+        diferentes — a Fase 1 só guarda "meu pedido mais recente"
+        (`minhaSolicitacao` em `PerfilScreen`), múltiplos vínculos não são
+        suportados ainda nem bloqueados explicitamente.
+      - Reconferir com o emulador o fluxo inteiro de ponta a ponta
+        (convite → aprovação → jogador confirma presença → sorteio →
+        jogador avalia colega) antes de considerar pronto.
