@@ -17,38 +17,58 @@ import { colors, POSICOES, POSICAO_LABEL_PLURAL, cardShadow } from '../theme';
 import Screen from '../components/Screen';
 import AuthBackground from '../components/AuthBackground';
 import EmptyState from '../components/EmptyState';
-import { gerarSugestoes, posicoesFaltando, faltasGlobais, FORMACAO_IDEAL } from '../utils/sorteio';
+import { gerarSugestoes, faltasGlobais, FORMACAO_IDEAL } from '../utils/sorteio';
 import { mostrarAlerta } from '../utils/alerta';
+import { mostrarToast } from '../utils/toast';
 import { compartilharTimes } from '../utils/compartilhar';
 import { iniciais } from '../utils/iniciais';
 import { useMinhaColecao } from '../hooks/useMinhaColecao';
+import TimeCard from '../components/TimeCard';
 
 const POSICAO_LABEL = Object.fromEntries(POSICOES.map((p) => [p.value, p.label]));
 const MIN_TIMES = 2;
 const MAX_TIMES = 6;
-const CORES_TIME = [colors.ocean, colors.sun, colors.coral, colors.navy, colors.success, colors.inkSoft];
 
 export default function SorteioScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const sessao = route.params?.sessao;
+  const repetir = route.params?.repetir;
   const { width } = useWindowDimensions();
   const largo = width >= 900;
 
+  function presentesDeRepetir(pelada) {
+    const ids = pelada.times?.flatMap((t) => t.jogadores?.map((j) => j.id) ?? []) ?? [];
+    return Object.fromEntries(ids.map((id) => [id, true]));
+  }
+
   const { dados: jogadores, carregando } = useMinhaColecao('jogadores', (a, b) => a.nome.localeCompare(b.nome));
-  const [presentes, setPresentes] = useState(() => sessao?.presentes ?? {});
-  const [numTimes, setNumTimes] = useState(2);
-  const [modo, setModo] = useState('balanceado');
+  const [presentes, setPresentes] = useState(() => sessao?.presentes ?? (repetir ? presentesDeRepetir(repetir) : {}));
+  const [numTimes, setNumTimes] = useState(repetir?.numTimes ?? 2);
+  const [modo, setModo] = useState(repetir?.modo ?? 'balanceado');
   const [sugestoes, setSugestoes] = useState(null);
   const [indiceSelecionado, setIndiceSelecionado] = useState(0);
   const [salvando, setSalvando] = useState(false);
   const times = sugestoes?.[indiceSelecionado]?.times ?? null;
 
+  // A tela fica montada ao trocar de aba — se o organizador voltar no
+  // Histórico e mandar "repetir" outra pelada, precisa reaplicar aqui em vez
+  // de ficar preso na primeira que foi aberta.
   useEffect(() => {
-    // Sem sessão: sorteio avulso, todo mundo começa marcado (o de sempre).
-    // Vindo de uma sessão: só quem foi confirmado lá aparece marcado — quem
-    // não mexeu no toggle não deve virar "presente" de graça.
-    if (sessao) return;
+    if (!repetir) return;
+    setPresentes(presentesDeRepetir(repetir));
+    setNumTimes(repetir.numTimes ?? 2);
+    setModo(repetir.modo ?? 'balanceado');
+    setSugestoes(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repetir?.id]);
+
+  useEffect(() => {
+    // Sem sessão nem "repetir": sorteio avulso, todo mundo começa marcado (o
+    // de sempre). Vindo de uma sessão ou de "repetir sorteio", só quem já
+    // estava confirmado aparece marcado — quem não mexeu no toggle não deve
+    // virar "presente" de graça.
+    if (sessao || repetir) return;
     setPresentes((atual) => {
       const novo = { ...atual };
       jogadores.forEach((j) => {
@@ -134,7 +154,13 @@ export default function SorteioScreen() {
         numTimes,
         // Firestore não aceita array dentro de array: cada time vira um objeto com um campo "jogadores"
         times: times.map((time) => ({
-          jogadores: time.map((j) => ({ id: j.id, nome: j.nome, nivelMedio: j.nivelMedio, posicao: j.posicao })),
+          jogadores: time.map((j) => ({
+            id: j.id,
+            nome: j.nome,
+            nivelMedio: j.nivelMedio,
+            posicao: j.posicao,
+            posicaoAdaptada: j.posicaoAdaptada ?? null,
+          })),
         })),
         ...(sessao ? { sessaoId: sessao.id, sessaoTitulo: sessao.titulo } : {}),
         createdAt: serverTimestamp(),
@@ -144,7 +170,7 @@ export default function SorteioScreen() {
       if (sessao) {
         await updateDoc(doc(db, 'sessoes', sessao.id), { presentes });
       }
-      mostrarAlerta('Pelada salva no histórico!');
+      mostrarToast('Pelada salva no histórico!');
       navigation.navigate('Historico');
     } catch (e) {
       mostrarAlerta('Não deu pra salvar. Tenta de novo.', e.message);
@@ -408,48 +434,9 @@ export default function SorteioScreen() {
                   )}
 
                   <View style={styles.resultadoGrid}>
-                    {times.map((time, i) => {
-                      const faltas = posicoesFaltando(time);
-                      const media = (
-                        time.reduce((soma, j) => soma + (j.nivelMedio ?? 3), 0) / time.length
-                      ).toFixed(1);
-                      return (
-                        <View key={i} style={[styles.timeCard, { borderTopColor: CORES_TIME[i % CORES_TIME.length] }]}>
-                          <Text style={styles.timeTitulo}>
-                            Time {i + 1} <Text style={styles.timeMedia}>— média {media}</Text>
-                          </Text>
-                          {time.map((j) => (
-                            <View key={j.id} style={styles.timeJogadorRow}>
-                              <Text style={styles.timeJogador} numberOfLines={1}>
-                                {j.nome}
-                              </Text>
-                              <View style={styles.timeJogadorTags}>
-                                <Text style={styles.timeJogadorTag}>
-                                  {POSICAO_LABEL[j.posicao] || j.posicao}
-                                </Text>
-                                <Text style={[styles.timeJogadorTag, styles.timeJogadorTagNivel]}>
-                                  Nível {j.nivelMedio ?? 3}
-                                </Text>
-                              </View>
-                            </View>
-                          ))}
-                          <View style={styles.timeStatusRow}>
-                            <Feather
-                              name={faltas.length ? 'alert-triangle' : 'check-circle'}
-                              size={12}
-                              color={faltas.length ? colors.coral : colors.success}
-                            />
-                            <Text style={faltas.length ? styles.timeAviso : styles.timeCompleto}>
-                              {faltas.length
-                                ? `Faltando: ${faltas
-                                    .map(({ posicao, falta }) => `${falta}x ${POSICAO_LABEL[posicao]}`)
-                                    .join(', ')}`
-                                : 'Formação completa'}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })}
+                    {times.map((time, i) => (
+                      <TimeCard key={i} numero={i + 1} jogadores={time} corIndex={i} />
+                    ))}
                   </View>
 
                   <View style={styles.acoesResultadoRow}>
@@ -636,39 +623,4 @@ const styles = StyleSheet.create({
   opcaoChipTextAtiva: { color: colors.ocean },
   opcaoChipDiferenca: { fontSize: 10, color: colors.inkSoft, marginTop: 2 },
   resultadoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10, marginBottom: 16 },
-  timeCard: {
-    flexGrow: 1,
-    flexBasis: 280,
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    borderTopWidth: 4,
-    padding: 14,
-    ...cardShadow,
-  },
-  timeTitulo: { fontSize: 15, fontWeight: '700', color: colors.navy, marginBottom: 8 },
-  timeMedia: { fontSize: 12, fontWeight: '600', color: colors.inkSoft },
-  timeJogadorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  timeJogador: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.ink },
-  timeJogadorTags: { flexDirection: 'row', gap: 4 },
-  timeJogadorTag: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.inkSoft,
-    backgroundColor: colors.sand,
-    borderRadius: 999,
-    paddingVertical: 2,
-    paddingHorizontal: 7,
-  },
-  timeJogadorTagNivel: { color: colors.ocean, backgroundColor: colors.oceanTint },
-  timeStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
-  timeAviso: { fontSize: 12, color: colors.coral, fontWeight: '700' },
-  timeCompleto: { fontSize: 12, color: colors.success, fontWeight: '700' },
 });

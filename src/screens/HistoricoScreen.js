@@ -1,14 +1,19 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { doc, deleteDoc } from 'firebase/firestore';
 import Feather from '@expo/vector-icons/Feather';
+import { db } from '../config/firebase';
 import { colors, cardShadow } from '../theme';
 import Screen from '../components/Screen';
 import AuthBackground from '../components/AuthBackground';
 import EmptyState from '../components/EmptyState';
 import { useMinhaColecao } from '../hooks/useMinhaColecao';
+import { confirmarAcao, mostrarAlerta } from '../utils/alerta';
+import { mostrarToast } from '../utils/toast';
 
 const MODO_LABEL = { balanceado: 'Balanceado', aleatorio: 'Aleatório' };
+const MIN_PELADAS_PARA_RANKING = 3;
 
 function formatarData(timestamp) {
   if (!timestamp) return '';
@@ -55,6 +60,17 @@ export default function HistoricoScreen() {
     return { totalPeladas: peladas.length, ranking, maxVezes, rankingVitorias, maxVitorias };
   }, [peladas]);
 
+  function handleExcluir(pelada) {
+    confirmarAcao('Excluir pelada', 'Isso remove essa pelada do histórico. Não dá pra desfazer.', async () => {
+      try {
+        await deleteDoc(doc(db, 'peladas', pelada.id));
+        mostrarToast('Pelada excluída.');
+      } catch (e) {
+        mostrarAlerta('Não deu pra excluir. Tenta de novo.', e.message);
+      }
+    });
+  }
+
   return (
     <Screen edges={['bottom']}>
       <AuthBackground />
@@ -75,7 +91,13 @@ export default function HistoricoScreen() {
             {estatisticas.totalPeladas > 1 ? 's' : ''}
           </Text>
 
-          <Text style={styles.statsSubtitulo}>Mais presentes</Text>
+          {estatisticas.totalPeladas < MIN_PELADAS_PARA_RANKING ? (
+            <Text style={styles.statsAviso}>
+              Mais estatísticas disponíveis após {MIN_PELADAS_PARA_RANKING} peladas salvas.
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.statsSubtitulo}>Mais presentes</Text>
           {estatisticas.ranking.map((jogador, i) => (
             <View key={jogador.nome + i} style={styles.rankingLinha}>
               <Text style={styles.rankingPosicao}>{i + 1}º</Text>
@@ -117,6 +139,8 @@ export default function HistoricoScreen() {
               ))}
             </>
           )}
+            </>
+          )}
         </View>
       )}
 
@@ -138,21 +162,49 @@ export default function HistoricoScreen() {
           contentContainerStyle={styles.lista}
           data={peladas}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate('PeladaDetalhe', { pelada: item })}
-            >
-              <View style={styles.cardTopo}>
-                <Text style={styles.data}>{formatarData(item.createdAt)}</Text>
-                {item.vencedorIndex != null && <Feather name="award" size={14} color="#8A6200" />}
-              </View>
-              {!!item.sessaoTitulo && <Text style={styles.sessaoTag}>{item.sessaoTitulo}</Text>}
-              <Text style={styles.meta}>
-                {item.numTimes} times · {MODO_LABEL[item.modo] || item.modo}
-              </Text>
-            </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const totalJogadores = item.times?.reduce((soma, t) => soma + (t.jogadores?.length || 0), 0) || 0;
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => navigation.navigate('PeladaDetalhe', { pelada: item })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.cardTopo}>
+                  <Text style={styles.data}>{formatarData(item.createdAt)}</Text>
+                  <View style={styles.cardTopoDireita}>
+                    {item.vencedorIndex != null && <Feather name="award" size={14} color="#8A6200" />}
+                    <Feather name="chevron-right" size={16} color={colors.inkSoft} />
+                  </View>
+                </View>
+                {!!item.sessaoTitulo && <Text style={styles.sessaoTag}>{item.sessaoTitulo}</Text>}
+                <Text style={styles.meta}>
+                  {totalJogadores} jogadores • {item.numTimes} times • {MODO_LABEL[item.modo] || item.modo}
+                </Text>
+
+                <View style={styles.cardAcoesRow}>
+                  <TouchableOpacity
+                    style={styles.cardAcaoBotao}
+                    onPress={() => navigation.navigate('PeladaDetalhe', { pelada: item })}
+                  >
+                    <Feather name="eye" size={13} color={colors.ocean} />
+                    <Text style={styles.cardAcaoTexto}>Ver times</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cardAcaoBotao}
+                    onPress={() => navigation.navigate('Sorteio', { repetir: item })}
+                  >
+                    <Feather name="repeat" size={13} color={colors.ocean} />
+                    <Text style={styles.cardAcaoTexto}>Repetir sorteio</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.cardAcaoBotao} onPress={() => handleExcluir(item)}>
+                    <Feather name="trash-2" size={13} color={colors.coral} />
+                    <Text style={[styles.cardAcaoTexto, { color: colors.coral }]}>Excluir</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
       </View>
@@ -173,7 +225,8 @@ const styles = StyleSheet.create({
   },
   statsHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statsTitulo: { fontSize: 14, fontWeight: '700', color: colors.navy },
-  statsTotal: { fontSize: 12, color: colors.inkSoft, marginTop: 2, marginBottom: 14 },
+  statsTotal: { fontSize: 12, color: colors.inkSoft, marginTop: 2, marginBottom: 4 },
+  statsAviso: { fontSize: 12, color: colors.inkSoft, fontStyle: 'italic' },
   statsSubtitulo: { fontSize: 12, fontWeight: '700', color: colors.ink, marginBottom: 8 },
   rankingLinha: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   rankingPosicao: { width: 20, fontSize: 12, fontWeight: '700', color: colors.inkSoft },
@@ -194,7 +247,11 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   cardTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardTopoDireita: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sessaoTag: { fontSize: 12, color: colors.ocean, fontWeight: '700', marginTop: 2 },
   data: { fontSize: 15, fontWeight: '700', color: colors.ink },
-  meta: { fontSize: 13, color: colors.inkSoft, marginTop: 2 },
+  meta: { fontSize: 13, color: colors.inkSoft, marginTop: 2, marginBottom: 10 },
+  cardAcoesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
+  cardAcaoBotao: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  cardAcaoTexto: { fontSize: 12, fontWeight: '700', color: colors.ocean },
 });

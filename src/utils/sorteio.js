@@ -56,7 +56,11 @@ export function sortearBalanceado(jogadores, numTimes) {
 
   function atribuir(jogador, time) {
     times[time].push(jogador);
-    contagemPosicao[time][jogador.posicao] = (contagemPosicao[time][jogador.posicao] || 0) + 1;
+    // Curinga com posicaoAdaptada conta pra posição que ele tá cobrindo, não
+    // pra "qualquer" — senão o próximo curinga não saberia que aquele buraco
+    // já foi tapado.
+    const posicaoEfetiva = jogador.posicaoAdaptada || jogador.posicao;
+    contagemPosicao[time][posicaoEfetiva] = (contagemPosicao[time][posicaoEfetiva] || 0) + 1;
     somaNiveis[time] += nivelOuPadrao(jogador);
   }
 
@@ -80,19 +84,36 @@ export function sortearBalanceado(jogadores, numTimes) {
   curingas.forEach((curinga) => {
     let alvo = 0;
     let maiorCarencia = -1;
+    let posicaoParaAdaptar = null;
+
     for (let i = 0; i < numTimes; i++) {
-      const carencia = Object.entries(FORMACAO_IDEAL).reduce(
-        (soma, [posicao, ideal]) => soma + Math.max(0, ideal - (contagemPosicao[i][posicao] || 0)),
-        0
-      );
-      const maisCarente = carencia > maiorCarencia;
-      const empateMenorNivel = carencia === maiorCarencia && somaNiveis[i] < somaNiveis[alvo];
+      let carenciaTime = 0;
+      let posicaoMaisCarenteDoTime = null;
+      let maiorFaltaDoTime = 0;
+
+      Object.entries(FORMACAO_IDEAL).forEach(([posicao, ideal]) => {
+        const falta = Math.max(0, ideal - (contagemPosicao[i][posicao] || 0));
+        carenciaTime += falta;
+        if (falta > maiorFaltaDoTime) {
+          maiorFaltaDoTime = falta;
+          posicaoMaisCarenteDoTime = posicao;
+        }
+      });
+
+      const maisCarente = carenciaTime > maiorCarencia;
+      const empateMenorNivel = carenciaTime === maiorCarencia && somaNiveis[i] < somaNiveis[alvo];
       if (maisCarente || empateMenorNivel) {
-        maiorCarencia = carencia;
+        maiorCarencia = carenciaTime;
         alvo = i;
+        posicaoParaAdaptar = posicaoMaisCarenteDoTime;
       }
     }
-    atribuir(curinga, alvo);
+
+    // Não muda o jogador original (a mesma referência é reaproveitada em
+    // várias tentativas de sorteio) — cria uma cópia só com a posição
+    // adaptada marcada, pra tela poder avisar "Lucas — Central (adaptado)".
+    const jogadorFinal = posicaoParaAdaptar ? { ...curinga, posicaoAdaptada: posicaoParaAdaptar } : curinga;
+    atribuir(jogadorFinal, alvo);
   });
 
   return times;
@@ -160,10 +181,11 @@ function contarPosicoes(jogadores) {
   let curingas = 0;
 
   jogadores.forEach((jogador) => {
-    if (jogador.posicao === 'qualquer') {
+    const posicaoEfetiva = jogador.posicaoAdaptada || jogador.posicao;
+    if (posicaoEfetiva === 'qualquer') {
       curingas += 1;
-    } else if (jogador.posicao in FORMACAO_IDEAL) {
-      contagem[jogador.posicao] = (contagem[jogador.posicao] || 0) + 1;
+    } else if (posicaoEfetiva in FORMACAO_IDEAL) {
+      contagem[posicaoEfetiva] = (contagem[posicaoEfetiva] || 0) + 1;
     }
   });
 

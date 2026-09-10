@@ -89,43 +89,28 @@ em `firestore.rules`).
 
 ## Próximos passos / ideias em aberto
 
-Ordem de prioridade combinada na última revisão de UI (a mais recente manda
-nessa lista — o veredito foi "Jogadores e Sorteio já estão bons, o que mais
-destoa agora é Detalhe da pelada"):
+Itens 1-6 da última revisão de UI já foram resolvidos:
 
-1. [ ] **Reformular `PeladaDetalheScreen`** — hoje é a tela mais fraca
-       visualmente: sem container `maxWidth`, sem fundo esportivo, cards de
-       time em linhas gigantes sem posição/nível, botão "Avaliar jogadores"
-       esticando a tela inteira. Reaproveitar o mesmo cartão de time que o
-       resultado do Sorteio usa (posição+nível em etiqueta, média no título,
-       cor por time) — vale extrair um componente `TimeCard` compartilhado
-       entre `SorteioScreen` e `PeladaDetalheScreen` em vez de duplicar.
-       Adicionar opção **Empate** além de "Time N venceu" (hoje só marca um
-       vencedor, não cobre resultado empatado).
-2. [ ] **Trocar `mostrarAlerta`/`window.alert` por notificação in-app** pelo
-       menos nas confirmações de sucesso (ex: "Pelada salva no histórico!") —
-       hoje é o alerta nativo do navegador, destoa do resto do visual. Um
-       toast simples (some sozinho em ~3s, sem botão OK) resolve.
-3. [ ] **Uso do jogador "Qualquer" no sorteio balanceado não fica explícito**
-       — o algoritmo em `sortearBalanceado` (`src/utils/sorteio.js`) já prioriza
-       posição → coringa → nível, mas quando um curinga cobre uma posição
-       faltante isso não aparece na tela: ele continua listado como
-       "Qualquer" e o time pode aparecer como incompleto mesmo com o coringa
-       ali. Falta marcar no resultado algo como "Lucas — Central (adaptado)"
-       quando isso acontecer.
-4. [ ] **Card do Histórico com mais informação** — hoje é só data/times/modo.
-       Adicionar contagem de jogadores e ações diretas (**Ver times**,
-       **Repetir sorteio**, **Excluir**). O ranking "mais presentes/mais
-       vitórias" não faz sentido com poucas peladas salvas (tudo empatado em
-       "1x") — só mostrar depois de um mínimo de peladas (3, por exemplo),
-       com uma mensagem tipo "Mais estatísticas disponíveis após 3 peladas"
-       antes disso.
-5. [ ] Reduzir mais a opacidade do fundo esportivo (`AuthBackground.js`) —
-       já foi cortado uma vez (`<G opacity={0.7}>` em volta de tudo) mas
-       ainda compete com os cards em telas com bastante conteúdo (Jogadores).
-6. [ ] Conferir `paddingBottom` do conteúdo rolável em todas as telas com
-       aba inferior (Sessões/Sorteio/Jogadores/Histórico) — a barra de abas
-       não pode cobrir o fim da lista.
+1. [x] `PeladaDetalheScreen` reformulada: container `maxWidth`, fundo
+       esportivo, e agora usa o componente `TimeCard`
+       ([`src/components/TimeCard.js`](src/components/TimeCard.js))
+       compartilhado com `SorteioScreen` — posição/nível em etiqueta, média
+       no título, cor por time. Ganhou opção **Empate** além de "Time N
+       venceu".
+2. [x] Notificação in-app (`src/components/ToastHost.js` +
+       `src/utils/toast.js`, montada em `App.js`) no lugar do alerta nativo
+       pras confirmações de sucesso (salvar pelada, excluir, marcar
+       resultado).
+3. [x] `sortearBalanceado` agora marca `jogador.posicaoAdaptada` quando um
+       curinga cobre uma posição faltante, e o `TimeCard` mostra
+       "Central (adaptado)" nesse caso em vez de só "Qualquer".
+4. [x] Card do Histórico mostra contagem de jogadores e ganhou ações **Ver
+       times**, **Repetir sorteio** (pré-preenche times/modo/presença no
+       Sorteio) e **Excluir**. Ranking do grupo só aparece depois de 3
+       peladas salvas (`MIN_PELADAS_PARA_RANKING`).
+5. [x] Fundo esportivo reduzido pra opacidade 0.4 (era 0.7) em
+       `AuthBackground.js`.
+6. [x] `paddingBottom: 90` conferido em Sessões/Sorteio/Jogadores/Histórico.
 
 Menores, sem prioridade definida ainda:
 

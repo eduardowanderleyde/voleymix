@@ -10,9 +10,9 @@ export default function AuthBackground() {
       preserveAspectRatio="xMidYMid slice"
     >
       <Rect x={0} y={0} width={400} height={800} fill={colors.sand} />
-      {/* As marcações de quadra ficam a 70% da opacidade original pra não
-          disputar atenção com os cards de conteúdo por cima. */}
-      <G opacity={0.7}>
+      {/* Decoração bem discreta — o conteúdo por cima (cards, texto) é o que
+          deve chamar atenção, isso aqui é só textura de fundo. */}
+      <G opacity={0.4}>
 
       <Circle cx={30} cy={80} r={160} fill={colors.ocean} opacity={0.1} />
       <Circle cx={370} cy={700} r={190} fill={colors.ocean} opacity={0.08} />
