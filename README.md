@@ -112,23 +112,36 @@ Itens 1-6 da última revisão de UI já foram resolvidos:
        `AuthBackground.js`.
 6. [x] `paddingBottom: 90` conferido em Sessões/Sorteio/Jogadores/Histórico.
 
-Menores, sem prioridade definida ainda:
+Resolvidos na rodada seguinte:
 
-- [ ] Filtro por nível (iniciante/intermediário/avançado) na aba Jogadores,
-      além do filtro por posição que já existe
-- [ ] Deixar claro o critério de "atacantes"/"defensores" nos indicadores
-      da aba Jogadores (hoje é ponteiro+oposto / central+líbero, mas não é
-      óbvio pra quem olha só o número)
-- [ ] Botões de editar/excluir jogador são pequenos — aumentar a área de
-      toque
+- [x] Filtro por nível (iniciante/intermediário/avançado) na aba Jogadores,
+      além do filtro por posição
+- [x] Legenda explicando "atacantes" (ponteiro+oposto) / "defensores"
+      (central+líbero) abaixo dos indicadores
+- [x] Botões de editar/excluir jogador com área de toque maior (32×32,
+      fundo próprio)
+- [x] Quando as opções de sorteio empatam na diferença de nível, mostra
+      ataque/defesa como critério extra (`diferencaHabilidade` em
+      `sorteio.js`)
+- [x] Médias e diferenças mostram vírgula (`3,2`) em vez de ponto (`3.2`)
+- [x] **Login com Google não quebra mais no Expo Go**: o pacote nativo
+      (`@react-native-google-signin/google-signin`) lançava um erro na hora
+      da importação se o app não tivesse o código nativo compilado — travava
+      a tela de Login inteira ao abrir no celular sem build customizado.
+      Agora carrega sob demanda (só quando o botão é apertado) com
+      try/catch — resto do app funciona normal no Expo Go, só o botão do
+      Google mostra aviso de que precisa de build de desenvolvimento.
+
+Ainda em aberto:
+
 - [ ] Painel lateral do Sorteio (config + composição) não fica claramente
       fixo durante a rolagem em telas largas — `position: sticky` está
       aplicado mas precisa de teste visual real num navegador
-- [ ] Quando as 3 opções de sorteio empatam na diferença de nível, mostrar
-      outro critério de comparação entre elas (hoje ficam indistinguíveis)
 - [ ] Testar o login com Google de verdade num build de desenvolvimento
       (apps já registrados no Firebase, falta só `expo prebuild` + rodar)
 - [ ] Ícone e splash personalizados (hoje é o padrão do Expo)
-- [ ] Confirmação de presença que o próprio jogador faz (hoje quem marca é
-      sempre o organizador) — exigiria conta por jogador ou link público,
-      avaliado e adiado por enquanto
+- [ ] **Conta por jogador** (cada jogador confirma a própria presença, em
+      vez de só o organizador marcar por ele) — decidido fazer, mas é uma
+      mudança de arquitetura grande (autenticação + regras do Firestore
+      passam a ter dois papéis: organizador e jogador convidado). Precisa
+      definir o fluxo de convite antes de começar a construir.
