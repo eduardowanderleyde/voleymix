@@ -47,7 +47,11 @@ export default function LoginScreen({ navigation }) {
         await garantirPerfilUsuario(auth.currentUser);
       }
     } catch (e) {
-      if (e.code !== 'auth/popup-closed-by-user' && e.code !== '12501') {
+      if (e.code === 'auth/popup-closed-by-user' || e.code === '12501') {
+        // usuário cancelou o popup/seletor de conta, não é erro pra mostrar
+      } else if (!e.code && e.message) {
+        setErro(e.message);
+      } else {
         setErro('Não foi possível entrar com o Google.');
       }
     } finally {

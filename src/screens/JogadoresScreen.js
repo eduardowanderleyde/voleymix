@@ -4,7 +4,15 @@ import { collection, query, where, doc, deleteDoc, addDoc, serverTimestamp, getD
 import { useNavigation } from '@react-navigation/native';
 import Feather from '@expo/vector-icons/Feather';
 import { auth, db } from '../config/firebase';
-import { colors, POSICOES, GRUPO_POSICAO, HABILIDADES, cardShadow, categoriaJogador, calcularNivelMedio } from '../theme';
+import {
+  colors,
+  POSICOES,
+  GRUPO_POSICAO,
+  HABILIDADES,
+  cardShadow,
+  categoriaJogador,
+  calcularNivelMedio,
+} from '../theme';
 import Screen from '../components/Screen';
 import AuthBackground from '../components/AuthBackground';
 import EmptyState from '../components/EmptyState';
@@ -13,6 +21,7 @@ import { iniciais } from '../utils/iniciais';
 import { useMinhaColecao } from '../hooks/useMinhaColecao';
 
 const POSICAO_LABEL = Object.fromEntries(POSICOES.map((p) => [p.value, p.label]));
+const CATEGORIAS_NIVEL = ['Iniciante', 'Intermediário', 'Avançado'];
 
 const JOGADORES_TESTE = [
   { nome: 'Ana', saque: 3, recepcao: 3, levantamento: 5, ataque: 3, bloqueio: 2, defesa: 3, posicao: 'levantador' },
@@ -51,6 +60,7 @@ export default function JogadoresScreen() {
   const [semeando, setSemeando] = useState(false);
   const [busca, setBusca] = useState('');
   const [filtroPosicao, setFiltroPosicao] = useState('todas');
+  const [filtroNivel, setFiltroNivel] = useState('todos');
 
   const stats = useMemo(() => {
     const contagem = { levantadores: 0, atacantes: 0, defensores: 0 };
@@ -67,9 +77,10 @@ export default function JogadoresScreen() {
     return jogadores.filter((j) => {
       const combinaBusca = j.nome.toLowerCase().includes(busca.trim().toLowerCase());
       const combinaPosicao = filtroPosicao === 'todas' || j.posicao === filtroPosicao;
-      return combinaBusca && combinaPosicao;
+      const combinaNivel = filtroNivel === 'todos' || categoriaJogador(j.nivelMedio ?? 3).label === filtroNivel;
+      return combinaBusca && combinaPosicao && combinaNivel;
     });
-  }, [jogadores, busca, filtroPosicao]);
+  }, [jogadores, busca, filtroPosicao, filtroNivel]);
 
   async function handleSemearTeste() {
     setSemeando(true);
@@ -160,6 +171,12 @@ export default function JogadoresScreen() {
         )}
 
         {jogadores.length > 0 && (
+          <Text style={styles.statsLegenda}>
+            Atacantes: ponteiro + oposto · Defensores: central + líbero
+          </Text>
+        )}
+
+        {jogadores.length > 0 && (
           <>
             <View style={styles.buscaRow}>
               <Feather name="search" size={16} color={colors.inkSoft} />
@@ -191,6 +208,28 @@ export default function JogadoresScreen() {
                     style={[styles.filtroChipText, filtroPosicao === p.value && styles.filtroChipTextAtivo]}
                   >
                     {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtrosScroll}>
+              <TouchableOpacity
+                style={[styles.filtroChip, filtroNivel === 'todos' && styles.filtroChipAtivo]}
+                onPress={() => setFiltroNivel('todos')}
+              >
+                <Text style={[styles.filtroChipText, filtroNivel === 'todos' && styles.filtroChipTextAtivo]}>
+                  Todos os níveis
+                </Text>
+              </TouchableOpacity>
+              {CATEGORIAS_NIVEL.map((categoria) => (
+                <TouchableOpacity
+                  key={categoria}
+                  style={[styles.filtroChip, filtroNivel === categoria && styles.filtroChipAtivo]}
+                  onPress={() => setFiltroNivel(categoria)}
+                >
+                  <Text style={[styles.filtroChipText, filtroNivel === categoria && styles.filtroChipTextAtivo]}>
+                    {categoria}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -234,13 +273,18 @@ export default function JogadoresScreen() {
                       </View>
                       <View style={styles.cardAcoes}>
                         <TouchableOpacity
+                          style={styles.cardAcaoBotao}
                           onPress={() => navigation.navigate('NovoJogador', { jogador: item })}
-                          hitSlop={8}
+                          hitSlop={10}
                         >
-                          <Feather name="edit-2" size={16} color={colors.inkSoft} />
+                          <Feather name="edit-2" size={17} color={colors.inkSoft} />
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => confirmarExclusao(item)} hitSlop={8}>
-                          <Feather name="trash-2" size={16} color={colors.coral} />
+                        <TouchableOpacity
+                          style={styles.cardAcaoBotao}
+                          onPress={() => confirmarExclusao(item)}
+                          hitSlop={10}
+                        >
+                          <Feather name="trash-2" size={17} color={colors.coral} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -254,7 +298,8 @@ export default function JogadoresScreen() {
                         <View style={styles.reputacaoBadge}>
                           <Feather name="star" size={10} color="#8A6200" />
                           <Text style={styles.reputacaoText}>
-                            {(item.somaAvaliacoes / item.qtdAvaliacoes).toFixed(1)} ({item.qtdAvaliacoes})
+                            {(item.somaAvaliacoes / item.qtdAvaliacoes).toFixed(1).replace('.', ',')} (
+                            {item.qtdAvaliacoes})
                           </Text>
                         </View>
                       )}
@@ -324,7 +369,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   addButtonText: { color: colors.white, fontWeight: '700', fontSize: 13 },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 6 },
+  statsLegenda: { fontSize: 11, color: colors.inkSoft, fontStyle: 'italic', marginBottom: 16 },
   statCard: {
     flexGrow: 1,
     flexBasis: 120,
@@ -381,7 +427,15 @@ const styles = StyleSheet.create({
   cardTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.white, fontWeight: '700', fontSize: 14 },
-  cardAcoes: { flexDirection: 'row', gap: 12 },
+  cardAcoes: { flexDirection: 'row', gap: 4 },
+  cardAcaoBotao: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.sand,
+  },
   nome: { fontSize: 16, fontWeight: '700', color: colors.ink, marginTop: 10 },
   badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' },
   categoriaBadge: { alignSelf: 'flex-start', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 10 },

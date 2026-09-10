@@ -51,6 +51,14 @@ export default function SorteioScreen() {
   const [salvando, setSalvando] = useState(false);
   const times = sugestoes?.[indiceSelecionado]?.times ?? null;
 
+  // Com poucos jogadores é comum duas ou três opções empatarem na diferença
+  // de nível — sem outro número pra comparar, elas parecem cópias uma da
+  // outra. Só mostra ataque/defesa como critério extra quando isso acontece.
+  const nivelEmpatado =
+    !!sugestoes &&
+    sugestoes.length > 1 &&
+    sugestoes.every((s) => s.diferenca.toFixed(1) === sugestoes[0].diferenca.toFixed(1));
+
   // A tela fica montada ao trocar de aba — se o organizador voltar no
   // Histórico e mandar "repetir" outra pelada, precisa reaplicar aqui em vez
   // de ficar preso na primeira que foi aberta.
@@ -419,14 +427,27 @@ export default function SorteioScreen() {
                             Opção {i + 1}
                           </Text>
                           {modo === 'balanceado' && (
-                            <Text
-                              style={[
-                                styles.opcaoChipDiferenca,
-                                indiceSelecionado === i && styles.opcaoChipTextAtiva,
-                              ]}
-                            >
-                              diferença de nível: {sugestao.diferenca.toFixed(1)}
-                            </Text>
+                            <>
+                              <Text
+                                style={[
+                                  styles.opcaoChipDiferenca,
+                                  indiceSelecionado === i && styles.opcaoChipTextAtiva,
+                                ]}
+                              >
+                                diferença de nível: {sugestao.diferenca.toFixed(1).replace('.', ',')}
+                              </Text>
+                              {nivelEmpatado && (
+                                <Text
+                                  style={[
+                                    styles.opcaoChipDiferenca,
+                                    indiceSelecionado === i && styles.opcaoChipTextAtiva,
+                                  ]}
+                                >
+                                  ataque: {sugestao.diferencaAtaque.toFixed(1).replace('.', ',')} · defesa:{' '}
+                                  {sugestao.diferencaDefesa.toFixed(1).replace('.', ',')}
+                                </Text>
+                              )}
+                            </>
                           )}
                         </TouchableOpacity>
                       ))}

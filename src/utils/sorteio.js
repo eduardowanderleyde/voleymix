@@ -140,6 +140,17 @@ export function diferencaNivel(times) {
   return Math.max(...medias) - Math.min(...medias);
 }
 
+// Mesma ideia de diferencaNivel, mas pra uma habilidade específica (ataque,
+// defesa etc). Usado como segundo critério quando duas opções de sorteio
+// empatam na diferença de nível geral — sem isso elas pareciam idênticas.
+export function diferencaHabilidade(times, campo) {
+  const medias = times.map((time) => {
+    if (!time.length) return 0;
+    return time.reduce((soma, j) => soma + (j[campo] ?? 3), 0) / time.length;
+  });
+  return Math.max(...medias) - Math.min(...medias);
+}
+
 function assinatura(times) {
   return times
     .map((time) => time.map((j) => j.id).sort().join(','))
@@ -164,11 +175,21 @@ export function gerarSugestoes(jogadores, numTimes, modo, quantidade = 3) {
     const chave = assinatura(times);
     if (vistos.has(chave)) continue;
     vistos.add(chave);
-    sugestoes.push({ times, diferenca: diferencaNivel(times) });
+    sugestoes.push({
+      times,
+      diferenca: diferencaNivel(times),
+      diferencaAtaque: diferencaHabilidade(times, 'ataque'),
+      diferencaDefesa: diferencaHabilidade(times, 'defesa'),
+    });
   }
 
   if (modo === 'balanceado') {
-    sugestoes.sort((a, b) => a.diferenca - b.diferenca);
+    // Desempate: nível é o critério principal, mas se duas opções empatarem
+    // nele (comum com poucos jogadores), ataque e depois defesa decidem —
+    // sem isso as opções empatadas pareciam idênticas na tela.
+    sugestoes.sort(
+      (a, b) => a.diferenca - b.diferenca || a.diferencaAtaque - b.diferencaAtaque || a.diferencaDefesa - b.diferencaDefesa
+    );
   }
 
   return sugestoes;

@@ -8,8 +8,8 @@ const CORES_TIME = [colors.ocean, colors.sun, colors.coral, colors.navy, colors.
 
 export default function TimeCard({ numero, jogadores, destaque, corIndex }) {
   const media = jogadores.length
-    ? (jogadores.reduce((soma, j) => soma + (j.nivelMedio ?? 3), 0) / jogadores.length).toFixed(1)
-    : '0.0';
+    ? (jogadores.reduce((soma, j) => soma + (j.nivelMedio ?? 3), 0) / jogadores.length).toFixed(1).replace('.', ',')
+    : '0,0';
   const cor = CORES_TIME[(corIndex ?? numero - 1) % CORES_TIME.length];
   const faltas = posicoesFaltando(jogadores);
   const temAdaptacao = jogadores.some((j) => j.posicaoAdaptada);
