@@ -31,5 +31,19 @@ service cloud.firestore {
       allow update, delete: if request.auth != null
                              && resource.data.ownerId == request.auth.uid;
     }
+
+    // Pedido de um jogador pra entrar na pelada de um organizador, via
+    // código de convite. Só o próprio jogador cria o pedido (userId ==
+    // quem está logado); só o organizador dono do pedido (ownerId) pode
+    // aprovar/recusar mudando o status.
+    match /solicitacoes/{solicitacaoId} {
+      allow read: if request.auth != null
+                  && (resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid);
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.ownerId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+      allow delete: if request.auth != null
+                    && (resource.data.userId == request.auth.uid || resource.data.ownerId == request.auth.uid);
+    }
   }
 }

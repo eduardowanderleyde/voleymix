@@ -15,9 +15,7 @@ export function montarTextoTimes(times, { modo, data } = {}) {
   return linhas.join('\n').trim();
 }
 
-export async function compartilharTimes(times, opcoes) {
-  const texto = montarTextoTimes(times, opcoes);
-
+export async function compartilharTexto(texto) {
   if (Platform.OS !== 'web') {
     try {
       await Share.share({ message: texto });
@@ -40,4 +38,8 @@ export async function compartilharTimes(times, opcoes) {
       mostrarAlerta('Não deu pra compartilhar nem copiar.', 'Tenta selecionar o texto manualmente.');
     }
   }
+}
+
+export async function compartilharTimes(times, opcoes) {
+  await compartilharTexto(montarTextoTimes(times, opcoes));
 }
